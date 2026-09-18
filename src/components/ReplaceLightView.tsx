@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 // @ts-ignore
 import * as EXIF from 'exif-js';
 import { StreetLightData } from '../types';
-import { GAS_WEB_APP_URL, SHEET_URL } from '../constants';
+import { deleteReplacementHistory, getReplacementHistory, getStreetlights, saveStreetlight } from '../services/database';
 
 const formatCoord = (val: string | number) => {
     if (!val) return "";
@@ -119,12 +119,10 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
     };
 
     const refreshLights = async (): Promise<StreetLightData[] | null> => {
-        if (!SHEET_URL) return null;
         setIsRefreshingLights(true);
         try {
             console.log("[ReplaceLightView] Fetching latest streetlights database from SHEET_URL...");
-            const res = await fetch(`${SHEET_URL}?t=${Date.now()}`);
-            const locationRes = await res.json();
+            const locationRes = await getStreetlights();
 
             const processedLights: StreetLightData[] = locationRes
                 .map((row: any) => {
@@ -242,10 +240,8 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
     }, []);
 
     const fetchHistory = async () => {
-        if (!GAS_WEB_APP_URL) return;
         try {
-            const res = await fetch(`${GAS_WEB_APP_URL}?t=${Date.now()}`);
-            const data = await res.json();
+            const data = await getReplacementHistory();
             if (Array.isArray(data)) {
                 setHistory(data);
             }
@@ -613,11 +609,6 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
     };
 
     const handleSave = async (id: string, lat: string, lng: string, options?: { villageCode?: string, action?: string, beforeLat?: string, beforeLng?: string, time?: string, image?: string }) => {
-        if (!GAS_WEB_APP_URL) {
-            alert("還沒有設定好存檔的連結耶！");
-            return;
-        }
-
         setIsSaving(true);
         const currentLight = localLights.find(l => l.id === id);
         const payload = {
@@ -635,12 +626,7 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
         };
 
         try {
-            await fetch(GAS_WEB_APP_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            await saveStreetlight(payload);
 
             setSelectedImage(null);
             setFoundLight(null);
@@ -703,16 +689,7 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
         });
 
         try {
-            await fetch(GAS_WEB_APP_URL || '', {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'batchDelete',
-                    items,
-                    access_token: localStorage.getItem('sanyi_admin_auth')
-                })
-            });
+            await deleteReplacementHistory(items);
             setToast({ message: "咻～紀錄已經被清乾淨了 ✨", type: 'success' });
             setTimeout(() => setToast(null), 3000);
             setSelectedHistory(new Set());

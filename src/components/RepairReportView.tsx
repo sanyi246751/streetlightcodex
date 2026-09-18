@@ -4,7 +4,7 @@ import { ChevronLeft, AlertCircle, Loader2 } from 'lucide-react';
 // @ts-ignore
 import * as EXIF from 'exif-js';
 
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdpaA2X-qwW4RNbMnIdHKCE3D92rlx6aztJnFIZ9CIlBWpK5ga8f2XedMLIpjLToIr/exec";
+import { completeRepair, getPendingRepairs } from '../services/database';
 
 interface Group {
     id: number;
@@ -56,11 +56,7 @@ export default function RepairReportView({ onBack }: RepairReportViewProps) {
         setIsLoading(true);
         setLoadingError(null);
 
-        fetch(SCRIPT_URL, { signal: controller.signal })
-            .then(r => {
-                if (!r.ok) throw new Error("伺服器回應異常：" + r.status);
-                return r.json();
-            })
+        getPendingRepairs()
             .then(d => {
                 if (Array.isArray(d)) {
                     setProjectData(d);
@@ -276,19 +272,7 @@ export default function RepairReportView({ onBack }: RepairReportViewProps) {
 
         try {
             const finalNote = noteSelect === "其他" ? noteText : noteSelect;
-            const response = await fetch(SCRIPT_URL, {
-                method: "POST",
-                mode: 'no-cors', // 避開 GAS 跳轉導致的 CORS 問題
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    row: selectedItem,
-                    note: finalNote,
-                    dateStr: rDate,
-                    photos,
-                    nameA: cur?.colA,
-                    nameB: cur?.colB
-                })
-            });
+            await completeRepair(selectedItem, finalNote, rDate, photos);
 
             // 在 no-cors 模式下我們無法讀取回應內容，但如果沒有拋出異常通常代表發送成功
             clearInterval(smoothIntervalRef.current);
@@ -308,8 +292,7 @@ export default function RepairReportView({ onBack }: RepairReportViewProps) {
                 
                 // 重新讀取最新的待修清單 (剛剛維修的那筆會消失)
                 setIsLoading(true);
-                fetch(SCRIPT_URL)
-                    .then(r => r.json())
+                getPendingRepairs()
                     .then(d => {
                         if (Array.isArray(d)) setProjectData(d);
                     })

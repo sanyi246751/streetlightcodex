@@ -3,11 +3,10 @@ import './RepairReportView.css';
 import { ChevronLeft } from 'lucide-react';
 // @ts-ignore
 import * as EXIF from 'exif-js';
-import { SHEET_URL } from '../constants';
+import { getStreetlights, saveBaseSurvey } from '../services/database';
 import { StreetLightLocation } from '../types';
 
 // GAS WEB APP URL 供使用者日後自行替換
-const SURVEY_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAy3gjvGTXllNFKPhE3VEiPos7kZXn1qUWxUbZ6tPnicu7lOY3leznPl1-2J0yM24wPA/exec";
 
 interface BaseSurveyViewProps {
     onBack: () => void;
@@ -45,8 +44,7 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
         const offset = now.getTimezoneOffset() * 60000;
         const localISOTime = new Date(now.getTime() - offset).toISOString().slice(0, 16);
         setRDate(localISOTime);
-        fetch(SHEET_URL)
-            .then(r => r.json())
+        getStreetlights()
             .then(d => setLightsDict(d))
             .catch(err => console.error("Error fetching light references:", err));
     }, []);
@@ -431,18 +429,13 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
         startSmoothClimb(50.1, 98.5, 150);
 
         try {
-            await fetch(SURVEY_SCRIPT_URL, {
-                method: "POST",
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    dateStr: rDate,
-                    lightId: gpsLightId,
-                    lat: gpsLat,
-                    lng: gpsLng,
-                    photo1: a,
-                    photo2: b
-                })
+            await saveBaseSurvey({
+                dateStr: rDate,
+                lightId: gpsLightId,
+                lat: gpsLat,
+                lng: gpsLng,
+                photo1: a,
+                photo2: b
             });
 
             clearInterval(smoothIntervalRef.current);

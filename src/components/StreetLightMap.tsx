@@ -3,7 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, LayersControl,
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { StreetLightData, StreetLightLocation, RepairRecord } from '../types';
-import { SHEET_URL, CHECK_SHEET_URL, DEFAULT_CENTER, DEFAULT_ZOOM, VILLAGE_GEOJSON_URL } from '../constants';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, VILLAGE_GEOJSON_URL } from '../constants';
+import { getRepairRecords, getStreetlights } from '../services/database';
 import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -157,8 +158,8 @@ export default function StreetLightMap({
     async function fetchData() {
       try {
         const [locationRes, repairRes] = await Promise.all([
-          fetch(SHEET_URL).then(res => res.json()),
-          fetch(CHECK_SHEET_URL).then(res => res.json())
+          getStreetlights(),
+          getRepairRecords()
         ]);
 
         const unrepairedSet = new Set<string>();
