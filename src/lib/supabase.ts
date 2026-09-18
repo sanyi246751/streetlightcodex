@@ -26,6 +26,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const supabaseSelect = <T>(table: string, query = '') =>
   request<T[]>(`/rest/v1/${table}?${query}`);
 
+// Supabase/PostgREST projects commonly cap one response at 1,000 rows.
+// Fetch successive pages so maps and history lists are never silently truncated.
+export async function supabaseSelectAll<T>(table: string, query = ''): Promise<T[]> {
+  const pageSize = 1000;
+  const rows: T[] = [];
+
+  for (let offset = 0; ; offset += pageSize) {
+    const pageQuery = [query, `limit=${pageSize}`, `offset=${offset}`]
+      .filter(Boolean)
+      .join('&');
+    const page = await supabaseSelect<T>(table, pageQuery);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
 export const supabaseInsert = <T>(table: string, body: unknown) =>
   request<T[]>(`/rest/v1/${table}`, {
     method: 'POST',
@@ -61,4 +77,3 @@ export async function uploadDataUrl(dataUrl: string, folder: string): Promise<st
   if (!response.ok) throw new Error(`照片上傳失敗: ${await response.text()}`);
   return `${url}/storage/v1/object/public/streetlight-photos/${name}`;
 }
-

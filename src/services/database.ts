@@ -1,11 +1,11 @@
 import type { HistoryRecord, RepairRecord, StreetLightLocation } from '../types';
-import { supabaseDelete, supabaseInsert, supabaseSelect, supabaseUpdate, uploadDataUrl } from '../lib/supabase';
+import { supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate, uploadDataUrl } from '../lib/supabase';
 
 type StreetlightRow = { id: string; latitude: number; longitude: number; metadata?: Record<string, unknown> };
 type RepairRow = { id: number; streetlight_id: string; reported_at: string; fault: string; status: string; note?: string; metadata?: Record<string, unknown> };
 
 export async function getStreetlights(): Promise<StreetLightLocation[]> {
-  const rows = await supabaseSelect<StreetlightRow>('streetlights', 'select=id,latitude,longitude,metadata&order=id');
+  const rows = await supabaseSelectAll<StreetlightRow>('streetlights', 'select=id,latitude,longitude,metadata&order=id');
   return rows.map(r => ({
     ...(r.metadata || {}),
     '原路燈號碼': r.id,
@@ -15,7 +15,7 @@ export async function getStreetlights(): Promise<StreetLightLocation[]> {
 }
 
 export async function getRepairRecords(): Promise<RepairRecord[]> {
-  const rows = await supabaseSelect<RepairRow>('repair_reports', 'select=*&order=reported_at.desc');
+  const rows = await supabaseSelectAll<RepairRow>('repair_reports', 'select=*&order=reported_at.desc');
   return rows.map(r => ({
     ...(r.metadata || {}),
     '路燈編號': r.streetlight_id,
@@ -27,7 +27,7 @@ export async function getRepairRecords(): Promise<RepairRecord[]> {
 }
 
 export async function getPendingRepairs() {
-  const rows = await supabaseSelect<RepairRow>('repair_reports', 'select=*&status=eq.%E6%9C%AA%E6%9F%A5%E4%BF%AE&order=reported_at');
+  const rows = await supabaseSelectAll<RepairRow>('repair_reports', 'select=*&status=eq.%E6%9C%AA%E6%9F%A5%E4%BF%AE&order=reported_at');
   return rows.map(r => ({ row: String(r.id), colA: r.streetlight_id, colB: r.fault, text: `${r.streetlight_id} ${r.fault}`.trim() }));
 }
 
@@ -54,7 +54,7 @@ export async function saveBaseSurvey(input: { dateStr: string; lightId: string; 
 }
 
 export async function getReplacementHistory(): Promise<HistoryRecord[]> {
-  const rows = await supabaseSelect<any>('replacement_history', 'select=*&order=created_at.desc');
+  const rows = await supabaseSelectAll<any>('replacement_history', 'select=*&order=created_at.desc');
   return rows.map(r => ({
     '時間': r.created_at, '修改時間': r.created_at, '路燈編號': r.streetlight_id,
     '原緯度': String(r.old_latitude ?? ''), '原經度': String(r.old_longitude ?? ''),
