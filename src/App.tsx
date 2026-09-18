@@ -25,7 +25,7 @@ export default function App() {
   const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "chi0720";
 
   useEffect(() => {
-    // 確保路徑處理正確，BASE_URL 通常包含 /test_lightmap/
+    // GitHub Pages 子路徑由 Vite 的 BASE_URL 提供。
     const baseUrl = import.meta.env.BASE_URL || '/';
     const geojsonUrl = `${baseUrl}/data/Sanyi_villages.geojson`.replace(/\/+/g, '/');
 

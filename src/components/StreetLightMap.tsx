@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, LayersControl,
 import L from 'leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { StreetLightData, StreetLightLocation, RepairRecord } from '../types';
-import { DEFAULT_CENTER, DEFAULT_ZOOM, VILLAGE_GEOJSON_URL } from '../constants';
+import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants';
 import { getRepairRecords, getStreetlights } from '../services/database';
 import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';

@@ -30,6 +30,8 @@ jobs:
         run: npm run build
         env:
           VITE_ADMIN_PASSWORD: ${{ secrets.VITE_ADMIN_PASSWORD }}
+          VITE_SUPABASE_URL: https://wsvewayhaitwtxenfasw.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_mxh6-_O6-s1fF8ovNsM-uQ_DwB1BT64
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
