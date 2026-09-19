@@ -50,6 +50,10 @@ function parseTaiwanDateTime(twStr: string) {
   if (!twStr) return null;
   const cleaned = twStr.trim().replace(/\s+/g, ' ');
 
+  // Supabase returns ISO 8601 timestamps, for example 2026-02-02T02:22:48+00:00.
+  const standardDate = new Date(cleaned);
+  if (!isNaN(standardDate.getTime())) return standardDate;
+
   // Standard format: "2024/3/12 下午 2:30:00" or "2024/3/12 14:30:00"
   let match = cleaned.match(/^(\d+\/\d+\/\d+)\s*(上午|下午)?\s*(\d+:\d+(?::\d+)?)/);
 
@@ -268,6 +272,18 @@ export default function StreetLightMap({
     return `報修 ${daysPart}天${hoursPart}時 ${symbol}`;
   };
 
+  const getReportTimeText = (reportDate?: Date) => {
+    if (!reportDate) return "時間未記錄";
+    return new Intl.DateTimeFormat('zh-TW', {
+      timeZone: 'Asia/Taipei',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(reportDate);
+  };
+
   const createClusterCustomIcon = (cluster: any) => {
     const count = cluster.getChildCount();
     let size = "small";
@@ -352,6 +368,9 @@ export default function StreetLightMap({
                               </div>
                               <div className="text-[13px] text-slate-600">
                                 {getReportDiffText(light.reportDate)}
+                              </div>
+                              <div className="text-[11px] text-slate-500 tabular-nums">
+                                {getReportTimeText(light.reportDate)}
                               </div>
                               {light.fault && (
                                 <div className="text-[12px] text-red-500 font-medium flex gap-1 mt-0.5">
@@ -509,6 +528,7 @@ export default function StreetLightMap({
                 </div>
                 <div className="space-y-2 text-xs text-slate-600">
                   <p><span className="font-semibold">故障情形：</span>{light.fault || "未註明"}</p>
+                  <p><span className="font-semibold">通報時間：</span>{getReportTimeText(light.reportDate)}</p>
                   <p><span className="font-semibold">通報狀態：</span>{getReportDiffText(light.reportDate)}</p>
                   <a
                     href={`https://www.google.com/maps?q=&layer=c&cbll=${light.lat},${light.lng}`}
