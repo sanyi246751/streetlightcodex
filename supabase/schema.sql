@@ -80,6 +80,17 @@ create policy "temporary write replacement history" on public.replacement_histor
 drop policy if exists "temporary write base surveys" on public.base_surveys;
 create policy "temporary write base surveys" on public.base_surveys for insert to anon, authenticated with check (true);
 
+-- Temporary permissions required by the browser-based database manager.
+-- Replace these with authenticated admin policies before public production use.
+drop policy if exists "temporary delete repair reports" on public.repair_reports;
+create policy "temporary delete repair reports" on public.repair_reports for delete to anon, authenticated using (true);
+drop policy if exists "temporary read base surveys" on public.base_surveys;
+create policy "temporary read base surveys" on public.base_surveys for select to anon, authenticated using (true);
+drop policy if exists "temporary update base surveys" on public.base_surveys;
+create policy "temporary update base surveys" on public.base_surveys for update to anon, authenticated using (true) with check (true);
+drop policy if exists "temporary delete base surveys" on public.base_surveys;
+create policy "temporary delete base surveys" on public.base_surveys for delete to anon, authenticated using (true);
+
 insert into storage.buckets (id, name, public)
 values ('streetlight-photos', 'streetlight-photos', true)
 on conflict (id) do update set public = excluded.public;
@@ -88,4 +99,3 @@ drop policy if exists "public read streetlight photos" on storage.objects;
 create policy "public read streetlight photos" on storage.objects for select to public using (bucket_id = 'streetlight-photos');
 drop policy if exists "temporary upload streetlight photos" on storage.objects;
 create policy "temporary upload streetlight photos" on storage.objects for insert to anon, authenticated with check (bucket_id = 'streetlight-photos');
-

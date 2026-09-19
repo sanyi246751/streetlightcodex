@@ -8,6 +8,7 @@ import StreetLightMap from './components/StreetLightMap';
 import ReplaceLightView from './components/ReplaceLightView';
 import RepairReportView from './components/RepairReportView';
 import BaseSurveyView from './components/BaseSurveyView';
+import AdminDatabaseView from './components/AdminDatabaseView';
 import { StreetLightData } from './types';
 import { MapPin, Wrench, Settings, ClipboardCheck } from 'lucide-react';
 
@@ -17,7 +18,7 @@ export default function App() {
   console.log("[App] Component initialized");
   const [role, setRole] = useState<UserRole>(null);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'map' | 'replace' | 'report' | 'survey'>('map');
+  const [currentPage, setCurrentPage] = useState<'map' | 'replace' | 'report' | 'survey' | 'database'>('map');
   const [lights, setLights] = useState<StreetLightData[]>([]);
   const [villageData, setVillageData] = useState<any>(null);
 
@@ -171,6 +172,7 @@ export default function App() {
           }}
           onNavigateToReport={() => setCurrentPage('report')}
           onNavigateToSurvey={() => setCurrentPage('survey')}
+          onNavigateToDatabase={() => role === 'admin' && setCurrentPage('database')}
         />
       ) : currentPage === 'replace' ? (
         <ReplaceLightView
@@ -182,6 +184,8 @@ export default function App() {
         <BaseSurveyView
           onBack={() => setCurrentPage('map')}
         />
+      ) : currentPage === 'database' ? (
+        <AdminDatabaseView onBack={() => setCurrentPage('map')} />
       ) : (
         <RepairReportView
           onBack={() => setCurrentPage('map')}

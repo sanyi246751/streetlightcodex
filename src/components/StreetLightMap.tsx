@@ -5,7 +5,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import { StreetLightData, StreetLightLocation, RepairRecord } from '../types';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants';
 import { getRepairRecords, getStreetlights } from '../services/database';
-import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck } from 'lucide-react';
+import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Fix for Leaflet default icon issues in React
@@ -140,12 +140,14 @@ export default function StreetLightMap({
   onNavigateToReplace,
   onNavigateToReport,
   onNavigateToSurvey,
+  onNavigateToDatabase,
   villageData,
   role
 }: {
   onNavigateToReplace?: (data: StreetLightData[]) => void;
   onNavigateToReport?: () => void;
   onNavigateToSurvey?: () => void;
+  onNavigateToDatabase?: () => void;
   villageData: any;
   role?: 'officer' | 'maintenance' | 'admin' | 'survey' | null;
 }) {
@@ -417,6 +419,13 @@ export default function StreetLightMap({
               >
                 <ClipboardCheck className="w-4 h-4 shrink-0" />
                 <span className="whitespace-nowrap translate-y-[1px]">維修回報系統</span>
+              </button>
+              <button
+                onClick={() => onNavigateToDatabase?.()}
+                className="bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-900 transition-all shadow-sm w-full leading-none"
+              >
+                <Database className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap translate-y-[1px]">資料庫管理</span>
               </button>
             </>
           )}
