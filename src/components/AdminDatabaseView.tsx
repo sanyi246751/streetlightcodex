@@ -56,6 +56,22 @@ const displayValue = (value: unknown) => {
   return String(value);
 };
 
+const displayFieldValue = (value: unknown, type?: FieldType) => {
+  if (type !== 'datetime' || value === null || value === undefined || value === '') return displayValue(value);
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return displayValue(value);
+  return new Intl.DateTimeFormat('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  }).format(date);
+};
+
 const inputValue = (value: unknown, type?: FieldType) => {
   if (value === null || value === undefined) return '';
   if (type === 'json') return JSON.stringify(value, null, 2);
@@ -192,7 +208,7 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
             {loading ? <div className="p-16 text-center text-slate-500">資料載入中…</div> : (
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-600 sticky top-0 z-10"><tr>{config.fields.filter(f => f.type !== 'json').map(f => <th key={f.key} className="px-3 py-3 text-left whitespace-nowrap bg-slate-50">{f.label}</th>)}<th className="px-3 py-3 text-right sticky right-0 bg-slate-50">操作</th></tr></thead>
-                <tbody>{visibleRows.map((row, index) => <tr key={`${row[config.primaryKey]}-${index}`} className="border-t border-slate-100 hover:bg-cyan-50/40">{config.fields.filter(f => f.type !== 'json').map(field => <td key={field.key} className="px-3 py-2 max-w-[260px] truncate whitespace-nowrap" title={displayValue(row[field.key])}>{field.type === 'url' && row[field.key] ? <a href={row[field.key]} target="_blank" rel="noreferrer" className="text-cyan-700 underline">開啟連結</a> : displayValue(row[field.key])}</td>)}<td className="px-3 py-2 sticky right-0 bg-white whitespace-nowrap text-right"><button onClick={() => openEdit(row)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="編輯"><Edit3 className="w-4 h-4" /></button><button onClick={() => remove(row)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="刪除"><Trash2 className="w-4 h-4" /></button></td></tr>)}</tbody>
+                <tbody>{visibleRows.map((row, index) => <tr key={`${row[config.primaryKey]}-${index}`} className="border-t border-slate-100 hover:bg-cyan-50/40">{config.fields.filter(f => f.type !== 'json').map(field => <td key={field.key} className="px-3 py-2 max-w-[260px] truncate whitespace-nowrap" title={displayFieldValue(row[field.key], field.type)}>{field.type === 'url' && row[field.key] ? <a href={row[field.key]} target="_blank" rel="noreferrer" className="text-cyan-700 underline">開啟連結</a> : displayFieldValue(row[field.key], field.type)}</td>)}<td className="px-3 py-2 sticky right-0 bg-white whitespace-nowrap text-right"><button onClick={() => openEdit(row)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="編輯"><Edit3 className="w-4 h-4" /></button><button onClick={() => remove(row)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="刪除"><Trash2 className="w-4 h-4" /></button></td></tr>)}</tbody>
               </table>
             )}
           </div>
