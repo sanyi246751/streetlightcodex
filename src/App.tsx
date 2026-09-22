@@ -204,6 +204,11 @@ export default function App() {
           onNavigateToReport={() => setCurrentPage('report')}
           onNavigateToSurvey={() => setCurrentPage('survey')}
           onNavigateToDatabase={() => role === 'admin' && setCurrentPage('database')}
+          onBackHome={() => {
+            setRole(null);
+            setCurrentPage('map');
+            window.location.hash = '';
+          }}
         />
       ) : currentPage === 'replace' ? (
         <ReplaceLightView

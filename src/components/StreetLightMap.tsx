@@ -5,7 +5,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import { StreetLightData, StreetLightLocation, RepairRecord } from '../types';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants';
 import { getRepairRecords, getStreetlights } from '../services/database';
-import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck, Database } from 'lucide-react';
+import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck, Database, House } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Fix for Leaflet default icon issues in React
@@ -141,6 +141,7 @@ export default function StreetLightMap({
   onNavigateToReport,
   onNavigateToSurvey,
   onNavigateToDatabase,
+  onBackHome,
   villageData,
   role
 }: {
@@ -148,6 +149,7 @@ export default function StreetLightMap({
   onNavigateToReport?: () => void;
   onNavigateToSurvey?: () => void;
   onNavigateToDatabase?: () => void;
+  onBackHome?: () => void;
   villageData: any;
   role?: 'officer' | 'maintenance' | 'admin' | 'survey' | null;
 }) {
@@ -159,6 +161,13 @@ export default function StreetLightMap({
   const [unrepairedListOpen, setUnrepairedListOpen] = useState(true);
 
   const mapRef = useRef<L.Map | null>(null);
+
+  const roleDisplay = {
+    officer: { title: '承辦人員', color: 'bg-sky-600' },
+    maintenance: { title: '維修人員', color: 'bg-emerald-600' },
+    survey: { title: '路燈基座調查', color: 'bg-purple-600' },
+    admin: { title: '管理單位', color: 'bg-orange-500' },
+  }[role || 'officer'];
 
   useEffect(() => {
     async function fetchData() {
@@ -312,6 +321,20 @@ export default function StreetLightMap({
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-sans">
+      <div className="absolute top-4 left-4 z-[1000] flex items-center overflow-hidden rounded-2xl bg-white/95 shadow-lg backdrop-blur border border-slate-200">
+        <div className={`${roleDisplay.color} px-3 py-2.5 text-sm font-black text-white whitespace-nowrap`}>
+          {roleDisplay.title}
+        </div>
+        <button
+          onClick={onBackHome}
+          className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors whitespace-nowrap"
+          aria-label="返回身分選擇首頁"
+        >
+          <House className="h-4 w-4" />
+          <span className="hidden sm:inline">回首頁</span>
+        </button>
+      </div>
+
       {/* Search Bar (Shown for all except maintenance - WAIT, user now wants maintenance to have same interface as officer, just no bottom-right) */}
       {role !== null && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-[260px] px-0">
