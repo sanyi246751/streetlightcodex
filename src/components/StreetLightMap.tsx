@@ -466,15 +466,7 @@ export default function StreetLightMap({
         <MapController target={targetLocation} bounds={mapBounds} />
 
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="內政部TGOS地圖">
-            <TileLayer
-              attribution='&copy; <a href="https://www.nlsc.gov.tw/">內政部國土測繪中心</a>'
-              url="https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}"
-              maxNativeZoom={19}
-              maxZoom={22}
-            />
-          </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="OpenStreetMap">
+          <LayersControl.BaseLayer checked name="OpenStreetMap">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

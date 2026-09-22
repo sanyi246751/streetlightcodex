@@ -14,6 +14,23 @@ import { MapPin, Wrench, Settings, ClipboardCheck } from 'lucide-react';
 
 export type UserRole = 'officer' | 'maintenance' | 'admin' | 'survey' | null;
 
+const ROLE_ROUTES = ['officer', 'maintenance', 'survey', 'admin'] as const;
+
+function getRoleFromUrl(): UserRole {
+  const hashRoute = window.location.hash.replace(/^#\/?/, '').split('/')[0];
+  if (ROLE_ROUTES.includes(hashRoute as Exclude<UserRole, null>)) {
+    return hashRoute as Exclude<UserRole, null>;
+  }
+
+  // 相容舊版分享出去的 ?role=... 網址。
+  const legacyRole = new URLSearchParams(window.location.search).get('role');
+  if (ROLE_ROUTES.includes(legacyRole as Exclude<UserRole, null>)) {
+    return legacyRole as Exclude<UserRole, null>;
+  }
+
+  return null;
+}
+
 export default function App() {
   console.log("[App] Component initialized");
   const [role, setRole] = useState<UserRole>(null);
@@ -56,27 +73,40 @@ export default function App() {
         }
       });
 
-    const params = new URLSearchParams(window.location.search);
-    const roleParam = params.get('role');
+    const syncRoleFromUrl = () => {
+      const roleFromUrl = getRoleFromUrl();
 
-    if (roleParam === 'admin') {
-      const savedAuth = localStorage.getItem('sanyi_admin_auth');
-      if (savedAuth === ADMIN_PASSWORD) {
+      if (roleFromUrl === 'admin') {
+        const savedAuth = localStorage.getItem('sanyi_admin_auth');
+        if (savedAuth !== ADMIN_PASSWORD) {
+          setRole(null);
+          setCurrentPage('map');
+          window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`);
+          return;
+        }
         setIsAdminAuthenticated(true);
-        setRole('admin');
-      } else {
-        // 如果網址是 admin 但沒登入過，則對外顯示 null (回首頁)
-        setRole(null);
+      }
+
+      setRole(roleFromUrl);
+      setCurrentPage(roleFromUrl === 'survey' ? 'survey' : 'map');
+
+      // 舊版 query string 自動轉成新的獨立頁面網址。
+      if (roleFromUrl && !window.location.hash) {
         const url = new URL(window.location.href);
         url.searchParams.delete('role');
+        url.hash = `/${roleFromUrl}`;
         window.history.replaceState({}, '', url);
       }
-    } else if (roleParam === 'maintenance' || roleParam === 'officer' || roleParam === 'survey') {
-      setRole(roleParam as UserRole);
-      if (roleParam === 'survey') {
-        setCurrentPage('survey');
-      }
-    }
+    };
+
+    syncRoleFromUrl();
+    window.addEventListener('hashchange', syncRoleFromUrl);
+    window.addEventListener('popstate', syncRoleFromUrl);
+
+    return () => {
+      window.removeEventListener('hashchange', syncRoleFromUrl);
+      window.removeEventListener('popstate', syncRoleFromUrl);
+    };
   }, []);
 
   // 處理身分選擇並更新網址
@@ -91,14 +121,8 @@ export default function App() {
       localStorage.setItem('sanyi_admin_auth', ADMIN_PASSWORD);
     }
 
-    setRole(selectedRole);
-    if (selectedRole === 'survey') {
-      setCurrentPage('survey');
-    }
     if (selectedRole) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('role', selectedRole);
-      window.history.pushState({}, '', url);
+      window.location.hash = `/${selectedRole}`;
     }
   };
 
@@ -109,7 +133,8 @@ export default function App() {
         <h1 className="text-3xl font-extrabold text-[#FF8C69] mb-8">三義鄉公所路燈系統</h1>
         <div className="flex flex-col gap-4 w-full max-w-sm">
 
-          <button
+          <a
+            href="#/officer"
             onClick={() => handleRoleSelect('officer')}
             className="bg-white p-5 rounded-[2rem] shadow-sm hover:shadow-md border-2 border-slate-100 flex items-center gap-4 transition-all active:scale-95"
           >
@@ -118,9 +143,10 @@ export default function App() {
               <div className="text-xl font-bold">承辦人員</div>
               <div className="text-sm text-slate-400 font-medium">路燈編號查詢系統、查看待修清單、路燈通報系統</div>
             </div>
-          </button>
+          </a>
 
-          <button
+          <a
+            href="#/maintenance"
             onClick={() => handleRoleSelect('maintenance')}
             className="bg-white p-5 rounded-[2rem] shadow-sm hover:shadow-md border-2 border-slate-100 flex items-center gap-4 transition-all active:scale-95"
           >
@@ -129,9 +155,10 @@ export default function App() {
               <div className="text-xl font-bold">維修人員</div>
               <div className="text-sm text-slate-400 font-medium">查看待修清單、路燈編號查詢系統、維修回報系統</div>
             </div>
-          </button>
+          </a>
 
-          <button
+          <a
+            href="#/survey"
             onClick={() => handleRoleSelect('survey')}
             className="bg-white p-5 rounded-[2rem] shadow-sm hover:shadow-md border-2 border-slate-100 flex items-center gap-4 transition-all active:scale-95"
           >
@@ -140,10 +167,14 @@ export default function App() {
               <div className="text-xl font-bold">路燈基座調查</div>
               <div className="text-sm text-slate-400 font-medium">基座調查系統</div>
             </div>
-          </button>
+          </a>
 
-          <button
-            onClick={() => handleRoleSelect('admin')}
+          <a
+            href="#/admin"
+            onClick={(event) => {
+              event.preventDefault();
+              handleRoleSelect('admin');
+            }}
             className="bg-white p-5 rounded-[2rem] shadow-sm hover:shadow-md border-2 border-slate-100 flex items-center gap-4 transition-all active:scale-95"
           >
             <div className="p-3 bg-orange-100 text-[#FF8C69] rounded-2xl"><Settings className="w-8 h-8" /></div>
@@ -151,7 +182,7 @@ export default function App() {
               <div className="text-xl font-bold">管理單位</div>
               <div className="text-sm text-slate-400 font-medium">全部</div>
             </div>
-          </button>
+          </a>
 
         </div>
       </div>
