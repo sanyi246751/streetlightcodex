@@ -141,6 +141,7 @@ export default function StreetLightMap({
   onNavigateToReport,
   onNavigateToSurvey,
   onNavigateToDatabase,
+  onNavigateToFaultReport,
   onBackHome,
   villageData,
   role
@@ -149,6 +150,7 @@ export default function StreetLightMap({
   onNavigateToReport?: () => void;
   onNavigateToSurvey?: () => void;
   onNavigateToDatabase?: () => void;
+  onNavigateToFaultReport?: () => void;
   onBackHome?: () => void;
   villageData: any;
   role?: 'officer' | 'maintenance' | 'admin' | 'survey' | null;
@@ -454,7 +456,7 @@ export default function StreetLightMap({
           )}
           {(role === 'officer' || role === 'admin') && (
             <button
-              onClick={() => window.open('https://docs.google.com/forms/d/e/1FAIpQLSfWGZHxdMKfLZFyTVpaVU8oCW45KhCP5XzhmJn6StAW2_uIlA/viewform', '_blank')}
+              onClick={() => onNavigateToFaultReport?.()}
               className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-sm w-full leading-none"
             >
               <Lightbulb className="w-4 h-4 shrink-0 fill-yellow-400 text-yellow-300" />

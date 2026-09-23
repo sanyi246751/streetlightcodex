@@ -9,6 +9,7 @@ import ReplaceLightView from './components/ReplaceLightView';
 import RepairReportView from './components/RepairReportView';
 import BaseSurveyView from './components/BaseSurveyView';
 import AdminDatabaseView from './components/AdminDatabaseView';
+import FaultReportView from './components/FaultReportView';
 import { StreetLightData } from './types';
 import { MapPin, Wrench, Settings, ClipboardCheck } from 'lucide-react';
 
@@ -35,7 +36,7 @@ export default function App() {
   console.log("[App] Component initialized");
   const [role, setRole] = useState<UserRole>(null);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'map' | 'replace' | 'report' | 'survey' | 'database'>('map');
+  const [currentPage, setCurrentPage] = useState<'map' | 'replace' | 'report' | 'faultReport' | 'survey' | 'database'>('map');
   const [lights, setLights] = useState<StreetLightData[]>([]);
   const [villageData, setVillageData] = useState<any>(null);
 
@@ -75,6 +76,7 @@ export default function App() {
 
     const syncRoleFromUrl = () => {
       const roleFromUrl = getRoleFromUrl();
+      const pageFromUrl = window.location.hash.replace(/^#\/?/, '').split('/')[1];
 
       if (roleFromUrl === 'admin') {
         const savedAuth = localStorage.getItem('sanyi_admin_auth');
@@ -88,7 +90,7 @@ export default function App() {
       }
 
       setRole(roleFromUrl);
-      setCurrentPage(roleFromUrl === 'survey' ? 'survey' : 'map');
+      setCurrentPage(pageFromUrl === 'fault-report' ? 'faultReport' : roleFromUrl === 'survey' ? 'survey' : 'map');
 
       // 舊版 query string 自動轉成新的獨立頁面網址。
       if (roleFromUrl && !window.location.hash) {
@@ -204,6 +206,10 @@ export default function App() {
           onNavigateToReport={() => setCurrentPage('report')}
           onNavigateToSurvey={() => setCurrentPage('survey')}
           onNavigateToDatabase={() => role === 'admin' && setCurrentPage('database')}
+          onNavigateToFaultReport={() => {
+            setCurrentPage('faultReport');
+            window.location.hash = `/${role}/fault-report`;
+          }}
           onBackHome={() => {
             setRole(null);
             setCurrentPage('map');
@@ -222,6 +228,11 @@ export default function App() {
         />
       ) : currentPage === 'database' ? (
         <AdminDatabaseView onBack={() => setCurrentPage('map')} />
+      ) : currentPage === 'faultReport' ? (
+        <FaultReportView onBack={() => {
+          setCurrentPage('map');
+          window.location.hash = `/${role}`;
+        }} />
       ) : (
         <RepairReportView
           onBack={() => setCurrentPage('map')}

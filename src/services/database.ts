@@ -31,6 +31,23 @@ export async function getPendingRepairs() {
   return rows.map(r => ({ row: String(r.id), colA: r.streetlight_id, colB: r.fault, text: `${r.streetlight_id} ${r.fault}`.trim() }));
 }
 
+export async function createRepairReport(input: {
+  streetlightId: string;
+  fault: string;
+  reporterName: string;
+  phone: string;
+}) {
+  const [report] = await supabaseInsert<{ id: number }>('repair_reports', {
+    streetlight_id: input.streetlightId.trim(),
+    reported_at: new Date().toISOString(),
+    fault: input.fault.trim(),
+    status: '未查修',
+    reporter_name: input.reporterName.trim() || null,
+    metadata: { phone: input.phone.trim() }
+  });
+  return report;
+}
+
 export async function completeRepair(id: string, note: string, dateStr: string, photos: Array<{pre: string; post: string}>) {
   // Create fixed array slots before Storage triggers queue jobs, so a fast
   // background sync can safely replace each slot with its Drive URL.
