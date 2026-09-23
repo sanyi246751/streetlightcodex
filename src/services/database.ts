@@ -43,7 +43,9 @@ export async function createRepairReport(input: {
     fault: input.fault.trim(),
     status: '未查修',
     reporter_name: input.reporterName.trim() || null,
-    metadata: { phone: input.phone.trim() }
+    // Reserve the first photo slot before Storage creates its transfer job.
+    // The Drive sync function fills this slot after the upload completes.
+    metadata: { phone: input.phone.trim(), photos: [null] }
   });
   return report;
 }

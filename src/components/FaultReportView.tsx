@@ -1,6 +1,25 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, Lightbulb, LoaderCircle, Phone, UserRound } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle2, ChevronLeft, ImagePlus, Lightbulb, LoaderCircle, Phone, UserRound, X } from 'lucide-react';
 import { createRepairReport, getStreetlights } from '../services/database';
+import { uploadDataUrl } from '../lib/supabase';
+
+async function imageFileToDataUrl(file: File) {
+  const source = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = source;
+    await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error('照片無法讀取')); });
+    const maxEdge = 1600;
+    const scale = Math.min(1, maxEdge / Math.max(image.width, image.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(image.width * scale);
+    canvas.height = Math.round(image.height * scale);
+    canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.82);
+  } finally {
+    URL.revokeObjectURL(source);
+  }
+}
 
 export default function FaultReportView({ onBack }: { onBack: () => void }) {
   const [streetlightId, setStreetlightId] = useState('');
@@ -8,6 +27,7 @@ export default function FaultReportView({ onBack }: { onBack: () => void }) {
   const [faultDetail, setFaultDetail] = useState('');
   const [reporterName, setReporterName] = useState('');
   const [phone, setPhone] = useState('');
+  const [photo, setPhoto] = useState('');
   const [lightIds, setLightIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -36,7 +56,8 @@ export default function FaultReportView({ onBack }: { onBack: () => void }) {
     setError('');
     try {
       const fault = faultDetail.trim() ? `${faultType}：${faultDetail.trim()}` : faultType;
-      await createRepairReport({ streetlightId, fault, reporterName, phone });
+      const report = await createRepairReport({ streetlightId, fault, reporterName, phone });
+      if (photo) await uploadDataUrl(photo, `repair-reports/${report.id}/photos/0-pre`);
       setSubmitted(true);
     } catch (submitError) {
       console.error('[FaultReport] Submit failed:', submitError);
@@ -53,8 +74,9 @@ export default function FaultReportView({ onBack }: { onBack: () => void }) {
           <CheckCircle2 className="mx-auto h-20 w-20 text-emerald-500" />
           <h1 className="mt-5 text-2xl font-black text-slate-800">通報已成功送出</h1>
           <p className="mt-3 text-slate-500">路燈 {streetlightId.trim()} 已加入未查修清單。</p>
+          {photo && <p className="mt-2 text-sm text-slate-400">照片已上傳，將自動轉存至 Google Drive。</p>}
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
-            <button onClick={() => { setSubmitted(false); setStreetlightId(''); setFaultDetail(''); }} className="rounded-2xl bg-sky-600 px-5 py-3 font-bold text-white hover:bg-sky-700">繼續通報</button>
+            <button onClick={() => { setSubmitted(false); setStreetlightId(''); setFaultDetail(''); setPhoto(''); }} className="rounded-2xl bg-sky-600 px-5 py-3 font-bold text-white hover:bg-sky-700">繼續通報</button>
             <button onClick={onBack} className="rounded-2xl bg-slate-100 px-5 py-3 font-bold text-slate-700 hover:bg-slate-200">返回路燈地圖</button>
           </div>
         </section>
@@ -94,6 +116,25 @@ export default function FaultReportView({ onBack }: { onBack: () => void }) {
           <div className="grid gap-5 sm:grid-cols-2">
             <label className="block"><span className="mb-2 flex items-center gap-2 font-bold text-slate-700"><UserRound className="h-5 w-5 text-sky-500" />通報人</span><input value={reporterName} onChange={e => setReporterName(e.target.value)} placeholder="姓名（選填）" className="w-full rounded-2xl border-2 border-slate-200 px-4 py-3 outline-none focus:border-sky-500" /></label>
             <label className="block"><span className="mb-2 flex items-center gap-2 font-bold text-slate-700"><Phone className="h-5 w-5 text-sky-500" />聯絡電話</span><input type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="電話（選填）" className="w-full rounded-2xl border-2 border-slate-200 px-4 py-3 outline-none focus:border-sky-500" /></label>
+          </div>
+
+          <div>
+            <span className="mb-2 flex items-center gap-2 font-bold text-slate-700"><Camera className="h-5 w-5 text-sky-500" />現場照片 <span className="text-sm font-medium text-slate-400">（選填）</span></span>
+            {photo ? (
+              <div className="relative overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-50 p-2">
+                <img src={photo} alt="通報照片預覽" className="h-48 w-full rounded-xl object-cover" />
+                <button type="button" onClick={() => setPhoto('')} className="absolute right-4 top-4 rounded-full bg-slate-900/70 p-2 text-white hover:bg-slate-900" aria-label="移除照片"><X className="h-4 w-4" /></button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50 px-5 py-7 text-center text-sky-700 hover:border-sky-400 hover:bg-sky-100">
+                <ImagePlus className="h-8 w-8" /><span className="font-bold">拍照或選擇現場照片</span><span className="text-xs text-sky-600">照片會自動壓縮後上傳至 Google Drive</span>
+                <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={async e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try { setPhoto(await imageFileToDataUrl(file)); } catch { setError('照片讀取失敗，請改選另一張照片。'); }
+                }} />
+              </label>
+            )}
           </div>
 
           {error && <div role="alert" className="rounded-2xl bg-red-50 px-4 py-3 font-medium text-red-600">{error}</div>}
