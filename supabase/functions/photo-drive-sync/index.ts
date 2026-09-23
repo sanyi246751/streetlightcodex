@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'npm:@supabase/supabase-js';
 
 const headers = { 'Content-Type': 'application/json' };
 type Job = { id: number; storage_path: string; destination: 'base-survey' | 'replacement' | 'repair'; record_id: number; slot: string; status: string; drive_file_id?: string; drive_url?: string };
