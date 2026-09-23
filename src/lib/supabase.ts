@@ -62,9 +62,11 @@ export const supabaseDelete = (table: string, query: string) =>
     headers: { Prefer: 'return=minimal' }
   });
 
-export async function uploadDataUrl(dataUrl: string, folder: string): Promise<string> {
+export type StoredPhoto = { path: string; url: string };
+
+export async function uploadDataUrl(dataUrl: string, folder: string): Promise<StoredPhoto> {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) return dataUrl;
+  if (!match) throw new Error('照片格式錯誤');
   const mime = match[1];
   const bytes = Uint8Array.from(atob(match[2]), c => c.charCodeAt(0));
   const ext = mime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
@@ -75,5 +77,5 @@ export async function uploadDataUrl(dataUrl: string, folder: string): Promise<st
     body: bytes
   });
   if (!response.ok) throw new Error(`照片上傳失敗: ${await response.text()}`);
-  return `${url}/storage/v1/object/public/streetlight-photos/${name}`;
+  return { path: name, url: `${url}/storage/v1/object/public/streetlight-photos/${name}` };
 }
