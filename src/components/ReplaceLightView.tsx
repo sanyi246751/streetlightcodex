@@ -57,6 +57,7 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
     const [isSearching, setIsSearching] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [isProcessingImage, setIsProcessingImage] = useState(false);
+    const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
     const [selectedHistory, setSelectedHistory] = useState<Set<number>>(new Set());
 
     const [showConfirm, setShowConfirm] = useState<{ type: 'search' | 'new', id: string, lat: string, lng: string } | null>(null);
@@ -476,6 +477,7 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
         // 在 LINE 或部分 WebView 內使用 link.click() 下載 Blob 會被安全性原則阻擋導致網頁卡死或重新整理，故移除該下載邏輯以避免崩潰。
 
         setIsProcessingImage(true);
+        setSelectedImageFile(file);
         console.log(`[Photo] Processing ${mode} file:`, file.name, file.type, file.size);
 
         try {
@@ -622,7 +624,7 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
             villageName: manualVillage || detectedVillage,
             action: options?.action || (options?.villageCode ? "new" : "update"),
             time: options?.time,
-            image: options?.image || selectedImage
+            image: selectedImageFile
         };
 
         try {
@@ -630,6 +632,7 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
 
             setSelectedImage(null);
             setFoundLight(null);
+            setSelectedImageFile(null);
             setSearchId('');
             setSearchEdit({ lat: '', lng: '' });
 

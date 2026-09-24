@@ -96,6 +96,18 @@ values ('streetlight-photos', 'streetlight-photos', true)
 on conflict (id) do update set public = excluded.public;
 
 drop policy if exists "public read streetlight photos" on storage.objects;
+
+-- Private canonical storage; browser writes require a signed PUT URL.
+insert into storage.buckets (id, name, public)
+values ('case-photos', 'case-photos', false)
+on conflict (id) do update set public = false;
+
+create table if not exists public.photo_sync_settings (
+  singleton boolean primary key default true check (singleton),
+  google_drive_backup_enabled boolean not null default false
+);
+insert into public.photo_sync_settings (singleton, google_drive_backup_enabled)
+values (true, false) on conflict (singleton) do nothing;
 create policy "public read streetlight photos" on storage.objects for select to public using (bucket_id = 'streetlight-photos');
 drop policy if exists "temporary upload streetlight photos" on storage.objects;
 create policy "temporary upload streetlight photos" on storage.objects for insert to anon, authenticated with check (bucket_id = 'streetlight-photos');
@@ -143,7 +155,7 @@ create or replace function public.queue_streetlight_photo()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare m text[];
 begin
-  if new.bucket_id <> 'streetlight-photos' then return new; end if;
+  if new.bucket_id <> 'case-photos' then return new; end if;
   m := regexp_match(new.name, '^base-surveys/([0-9]+)/(before|after)/');
   if m is not null then
     insert into photo_transfers(storage_path, destination, record_id, slot)

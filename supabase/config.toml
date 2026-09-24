@@ -1,2 +1,5 @@
 [functions.photo-drive-sync]
 verify_jwt = false
+
+[functions.case-photo-upload-url]
+verify_jwt = false

@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Camera, CheckCircle2, ChevronLeft, ImagePlus, Lightbulb, LoaderCircle, Phone, UserRound, X } from 'lucide-react';
 import { createRepairReport, getStreetlights } from '../services/database';
-import { uploadDataUrl } from '../lib/supabase';
+import { uploadCasePhoto } from '../lib/supabase';
 
 async function imageFileToDataUrl(file: File) {
   const source = URL.createObjectURL(file);
@@ -28,6 +28,7 @@ export default function FaultReportView({ onBack }: { onBack: () => void }) {
   const [reporterName, setReporterName] = useState('');
   const [phone, setPhone] = useState('');
   const [photo, setPhoto] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [lightIds, setLightIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -57,7 +58,7 @@ export default function FaultReportView({ onBack }: { onBack: () => void }) {
     try {
       const fault = faultDetail.trim() ? `${faultType}：${faultDetail.trim()}` : faultType;
       const report = await createRepairReport({ streetlightId, fault, reporterName, phone });
-      if (photo) await uploadDataUrl(photo, `repair-reports/${report.id}/photos/0-pre`);
+      if (photoFile) await uploadCasePhoto(photoFile, 'repair', report.id, '0-pre');
       setSubmitted(true);
     } catch (submitError) {
       console.error('[FaultReport] Submit failed:', submitError);
@@ -130,6 +131,7 @@ export default function FaultReportView({ onBack }: { onBack: () => void }) {
                 <ImagePlus className="h-8 w-8" /><span className="font-bold">拍照或選擇現場照片</span><span className="text-xs text-sky-600">照片會自動壓縮後上傳至 Google Drive</span>
                 <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={async e => {
                   const file = e.target.files?.[0];
+                  setPhotoFile(file);
                   if (!file) return;
                   try { setPhoto(await imageFileToDataUrl(file)); } catch { setError('照片讀取失敗，請改選另一張照片。'); }
                 }} />

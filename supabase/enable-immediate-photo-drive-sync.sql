@@ -20,8 +20,9 @@ create or replace function public.queue_streetlight_photo()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare m text[];
 begin
-  if new.bucket_id <> 'streetlight-photos' then return new; end if;
+  if new.bucket_id <> 'case-photos' then return new; end if;
   m := regexp_match(new.name, '^base-surveys/([0-9]+)/(before|after)/');
+  if not coalesce((select google_drive_backup_enabled from photo_sync_settings where singleton), false) then return new; end if;
   if m is not null then
     insert into photo_transfers(storage_path, destination, record_id, slot)
     values (new.name, 'base-survey', m[1]::bigint, m[2]) on conflict (storage_path) do nothing;

@@ -10,6 +10,8 @@ interface Group {
     id: number;
     pre: string | null;
     post: string | null;
+    preFile?: File;
+    postFile?: File;
 }
 
 interface ProjectItem {
@@ -160,7 +162,7 @@ export default function RepairReportView({ onBack }: RepairReportViewProps) {
         reader.onload = (event) => {
             const dataUrl = event.target?.result as string;
             setGroups(prev => prev.map(g => {
-                if (g.id === groupId) return { ...g, [type]: dataUrl };
+                if (g.id === groupId) return { ...g, [type]: dataUrl, [type === 'pre' ? 'preFile' : 'postFile']: file };
                 return g;
             }));
         };
@@ -261,7 +263,7 @@ export default function RepairReportView({ onBack }: RepairReportViewProps) {
             setUploadProgress(p2);
             setUploadText(p2.toFixed(1) + "%");
 
-            photos.push({ pre: a, post: b });
+            photos.push({ pre: g.preFile!, post: g.postFile! });
         }
 
         setUploadTitle("🚀 資料傳送中...");

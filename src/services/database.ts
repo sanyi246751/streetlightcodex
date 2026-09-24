@@ -1,5 +1,5 @@
 import type { HistoryRecord, RepairRecord, StreetLightLocation } from '../types';
-import { supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate, uploadDataUrl } from '../lib/supabase';
+import { supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate, uploadCasePhoto } from '../lib/supabase';
 
 type StreetlightRow = { id: string; latitude: number; longitude: number; metadata?: Record<string, unknown> };
 type RepairRow = { id: number; streetlight_id: string; reported_at: string; fault: string; status: string; note?: string; metadata?: Record<string, unknown> };
@@ -50,7 +50,7 @@ export async function createRepairReport(input: {
   return report;
 }
 
-export async function completeRepair(id: string, note: string, dateStr: string, photos: Array<{pre: string; post: string}>) {
+export async function completeRepair(id: string, note: string, dateStr: string, photos: Array<{pre: File; post: File}>) {
   // Create fixed array slots before Storage triggers queue jobs, so a fast
   // background sync can safely replace each slot with its Drive URL.
   await supabaseUpdate('repair_reports', `id=eq.${encodeURIComponent(id)}`, {
@@ -58,20 +58,20 @@ export async function completeRepair(id: string, note: string, dateStr: string, 
     metadata: { photos: Array(photos.length * 2).fill(null) }
   });
   await Promise.all(photos.flatMap((p, i) => [
-    uploadDataUrl(p.pre, `repair-reports/${id}/photos/${i}-pre`),
-    uploadDataUrl(p.post, `repair-reports/${id}/photos/${i}-post`)
+    uploadCasePhoto(p.pre, 'repair', id, `${i}-pre`),
+    uploadCasePhoto(p.post, 'repair', id, `${i}-post`)
   ]));
 }
 
-export async function saveBaseSurvey(input: { dateStr: string; lightId: string; lat: number | null; lng: number | null; photo1: string; photo2: string }) {
+export async function saveBaseSurvey(input: { dateStr: string; lightId: string; lat: number | null; lng: number | null; photo1: File | null; photo2: File | null }) {
   const [survey] = await supabaseInsert<{ id: number }>('base_surveys', {
     streetlight_id: input.lightId, surveyed_at: input.dateStr,
     latitude: input.lat, longitude: input.lng,
     before_photo_url: null, after_photo_url: null
   });
   await Promise.all([
-    input.photo1 ? uploadDataUrl(input.photo1, `base-surveys/${survey.id}/before`) : Promise.resolve(null),
-    input.photo2 ? uploadDataUrl(input.photo2, `base-surveys/${survey.id}/after`) : Promise.resolve(null)
+    input.photo1 ? uploadCasePhoto(input.photo1, 'base-survey', survey.id, 'before') : Promise.resolve(null),
+    input.photo2 ? uploadCasePhoto(input.photo2, 'base-survey', survey.id, 'after') : Promise.resolve(null)
   ]);
   return [survey];
 }
@@ -86,7 +86,7 @@ export async function getReplacementHistory(): Promise<HistoryRecord[]> {
   }));
 }
 
-export async function saveStreetlight(input: { id: string; lat: string; lng: string; beforeLat?: string; beforeLng?: string; villageCode?: string; villageName?: string; action: string; time?: string; image?: string }) {
+export async function saveStreetlight(input: { id: string; lat: string; lng: string; beforeLat?: string; beforeLng?: string; villageCode?: string; villageName?: string; action: string; time?: string; image?: File | null }) {
   await supabaseInsert('streetlights', {
     id: input.id, latitude: Number(input.lat), longitude: Number(input.lng),
     village_code: input.villageCode || null, village_name: input.villageName || null
@@ -102,7 +102,7 @@ export async function saveStreetlight(input: { id: string; lat: string; lng: str
     photo_url: null, created_at: input.time || new Date().toISOString()
   });
   if (!input.image) return [history];
-  await uploadDataUrl(input.image, `replacement-history/${history.id}/photo`);
+  await uploadCasePhoto(input.image, 'replacement', history.id, 'photo');
   return [history];
 }
 

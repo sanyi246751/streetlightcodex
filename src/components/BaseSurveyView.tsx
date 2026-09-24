@@ -23,6 +23,8 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
     const [prePhoto, setPrePhoto] = useState<string | null>(null);
     const [postPhoto, setPostPhoto] = useState<string | null>(null);
 
+    const [prePhotoFile, setPrePhotoFile] = useState<File | null>(null);
+    const [postPhotoFile, setPostPhotoFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [isLocating, setIsLocating] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -326,6 +328,8 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
             const dataUrl = event.target?.result as string;
             if (type === 'pre') setPrePhoto(dataUrl);
             if (type === 'post') setPostPhoto(dataUrl);
+            if (type === 'pre') setPrePhotoFile(file);
+            if (type === 'post') setPostPhotoFile(file);
         };
         reader.readAsDataURL(file);
 
@@ -434,8 +438,8 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
                 lightId: gpsLightId,
                 lat: gpsLat,
                 lng: gpsLng,
-                photo1: a,
-                photo2: b
+                photo1: prePhotoFile,
+                photo2: postPhotoFile
             });
 
             clearInterval(smoothIntervalRef.current);

@@ -79,3 +79,21 @@ export async function uploadDataUrl(dataUrl: string, folder: string): Promise<St
   if (!response.ok) throw new Error(`照片上傳失敗: ${await response.text()}`);
   return { path: name, url: `${url}/storage/v1/object/public/streetlight-photos/${name}` };
 }
+
+export type PhotoDestination = 'base-survey' | 'replacement' | 'repair';
+type SignedUpload = { path: string; signedUrl: string; token?: string };
+
+/** PUT the untouched File to a short-lived, single-use Storage URL. */
+export async function uploadCasePhoto(file: File, destination: PhotoDestination, recordId: string | number, slot: string) {
+  if (!isSupabaseConfigured) throw new Error('Supabase is not configured');
+  if (!file.type.startsWith('image/')) throw new Error('Only image files are allowed');
+  const signed = await request<SignedUpload>('/functions/v1/case-photo-upload-url', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ destination, recordId, slot, contentType: file.type })
+  });
+  const response = await fetch(signed.signedUrl, {
+    method: 'PUT', headers: { 'Content-Type': file.type }, body: file
+  });
+  if (!response.ok) throw new Error(`Photo upload failed: ${await response.text()}`);
+  return signed.path;
+}
