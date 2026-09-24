@@ -12,21 +12,21 @@ declare
 begin
   if new.bucket_id <> 'streetlight-photos' then return new; end if;
 
-  m := regexp_match(new.name, '^repair-reports/(.+)_(前|後)\\.[^/]+$');
+  m := regexp_match(new.name, '^repair-reports/(.+)_(before|after)\\.[^/]+$');
   if m is not null then
     select id into target_record_id from repair_reports
     where streetlight_id = m[1]
     order by repaired_at desc nulls last, id desc limit 1;
     target_destination := 'repair';
-    target_slot := case when m[2] = '前' then '0-pre' else '0-post' end;
+    target_slot := case when m[2] = 'before' then '0-pre' else '0-post' end;
   else
-    m := regexp_match(new.name, '^base-surveys/(.+)_(前|後)\\.[^/]+$');
+    m := regexp_match(new.name, '^base-surveys/(.+)_(before|after)\\.[^/]+$');
     if m is not null then
       select id into target_record_id from base_surveys
       where streetlight_id = m[1]
       order by created_at desc, id desc limit 1;
       target_destination := 'base-survey';
-      target_slot := case when m[2] = '前' then 'before' else 'after' end;
+      target_slot := case when m[2] = 'before' then 'before' else 'after' end;
     else
       m := regexp_match(new.name, '^replacement-history/([0-9]+)/photo/');
       if m is null then return new; end if;

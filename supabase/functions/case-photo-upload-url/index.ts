@@ -15,7 +15,9 @@ Deno.serve(async request => {
     if (recordError || !record) throw new Error('Case not found');
     const extension = /png/i.test(contentType) ? 'png' : /webp/i.test(contentType) ? 'webp' : 'jpg';
     const lightId = String(record.streetlight_id || '').trim().replace(/[\\/:*?"<>|]/g, '-');
-    const side = slot === 'before' || slot.endsWith('-pre') ? '前' : '後';
+    // Supabase Storage object keys reject Chinese characters, so use portable
+    // ASCII filenames while retaining the same 前／後 meaning.
+    const side = slot === 'before' || slot.endsWith('-pre') ? 'before' : 'after';
     const path = destination === 'base-survey'
       ? `base-surveys/${lightId}_${side}.${extension}`
       : destination === 'repair'
