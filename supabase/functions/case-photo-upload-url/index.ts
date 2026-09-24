@@ -16,7 +16,7 @@ Deno.serve(async request => {
     const extension = /png/i.test(contentType) ? 'png' : /webp/i.test(contentType) ? 'webp' : 'jpg';
     const folder = destination === 'base-survey' ? `base-surveys/${recordId}` : destination === 'replacement' ? `replacement-history/${recordId}` : `repair-reports/${recordId}/photos`;
     const path = `${folder}/${slot}/${crypto.randomUUID()}.${extension}`;
-    const { data, error } = await supabase.storage.from('case-photos').createSignedUploadUrl(path, { upsert: false });
+    const { data, error } = await supabase.storage.from('streetlight-photos').createSignedUploadUrl(path, { upsert: false });
     if (error || !data) throw error || new Error('Could not create signed upload URL');
     return new Response(JSON.stringify({ path, signedUrl: data.signedUrl, token: data.token }), { headers: cors });
   } catch (error) {
