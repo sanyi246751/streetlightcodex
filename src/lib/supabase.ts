@@ -92,7 +92,7 @@ export async function uploadCasePhoto(file: File, destination: PhotoDestination,
     body: JSON.stringify({ destination, recordId, slot, contentType: file.type })
   });
   const response = await fetch(signed.signedUrl, {
-    method: 'PUT', headers: { 'Content-Type': file.type }, body: file
+    method: 'PUT', headers: { 'Content-Type': file.type, 'x-upsert': 'true' }, body: file
   });
   if (!response.ok) throw new Error(`Photo upload failed: ${await response.text()}`);
   return signed.path;

@@ -302,7 +302,9 @@ export default function RepairReportView({ onBack }: RepairReportViewProps) {
             }, 800);
         } catch (err) {
             clearInterval(smoothIntervalRef.current);
-            alert("上傳失敗，請檢查網路後重試。");
+            console.error("[RepairReport] Upload failed:", err);
+            const reason = err instanceof Error ? err.message : "未知錯誤";
+            alert(`上傳失敗：${reason}`);
             setIsUploading(false);
         }
     };
