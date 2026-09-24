@@ -156,13 +156,13 @@ returns trigger language plpgsql security definer set search_path = public as $$
 declare m text[]; target_record_id bigint; target_destination text; target_slot text;
 begin
   if new.bucket_id <> 'streetlight-photos' then return new; end if;
-  m := regexp_match(new.name, '^repair-reports/(.+)_(before|after)\\.[^/]+$');
+  m := regexp_match(new.name, '^repair-reports/(.+)_(before|after)[.][^/]+$');
   if m is not null then
     select id into target_record_id from repair_reports where streetlight_id = m[1]
     order by repaired_at desc nulls last, id desc limit 1;
     target_destination := 'repair'; target_slot := case when m[2] = 'before' then '0-pre' else '0-post' end;
   else
-    m := regexp_match(new.name, '^base-surveys/(.+)_(before|after)\\.[^/]+$');
+    m := regexp_match(new.name, '^base-surveys/(.+)_(before|after)[.][^/]+$');
     if m is not null then
       select id into target_record_id from base_surveys where streetlight_id = m[1]
       order by created_at desc, id desc limit 1;

@@ -2,6 +2,20 @@
 -- as their Storage filename and the queue resolves that lamp number back to
 -- the newest matching repair/base-survey record.
 
+create or replace function public.request_photo_drive_sync()
+returns void language plpgsql security definer set search_path = public, net, vault as $$
+begin
+  perform net.http_post(
+    url := (select decrypted_secret from vault.decrypted_secrets where name = 'photo_sync_project_url') || '/functions/v1/photo-drive-sync',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-photo-sync-secret',
+      (select decrypted_secret from vault.decrypted_secrets where name = 'photo_sync_cron_secret')),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 55000
+  );
+exception when others then
+  raise warning 'Could not start immediate photo sync: %', sqlerrm;
+end $$;
+
 create or replace function public.queue_streetlight_photo()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
@@ -12,7 +26,7 @@ declare
 begin
   if new.bucket_id <> 'streetlight-photos' then return new; end if;
 
-  m := regexp_match(new.name, '^repair-reports/(.+)_(before|after)\\.[^/]+$');
+  m := regexp_match(new.name, '^repair-reports/(.+)_(before|after)[.][^/]+$');
   if m is not null then
     select id into target_record_id from repair_reports
     where streetlight_id = m[1]
@@ -20,7 +34,7 @@ begin
     target_destination := 'repair';
     target_slot := case when m[2] = 'before' then '0-pre' else '0-post' end;
   else
-    m := regexp_match(new.name, '^base-surveys/(.+)_(before|after)\\.[^/]+$');
+    m := regexp_match(new.name, '^base-surveys/(.+)_(before|after)[.][^/]+$');
     if m is not null then
       select id into target_record_id from base_surveys
       where streetlight_id = m[1]
