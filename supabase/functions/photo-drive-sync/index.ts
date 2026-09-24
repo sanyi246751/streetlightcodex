@@ -31,14 +31,14 @@ Deno.serve(async (request) => {
     try {
       let drive = { id: job.drive_file_id || '', url: job.drive_url || '' };
       if (job.status !== 'drive_uploaded') {
-        const { data: signed, error: signError } = await supabase.storage.from('case-photos').createSignedUrl(job.storage_path, 600);
-        if (signError || !signed?.signedUrl) throw new Error(signError?.message || 'Cannot create temporary download link');
-        drive = await uploadThroughGas(job, signed.signedUrl);
+        const publicPath = job.storage_path.split('/').map(encodeURIComponent).join('/');
+        const sourceUrl = `${required('SUPABASE_URL')}/storage/v1/object/public/streetlight-photos/${publicPath}`;
+        drive = await uploadThroughGas(job, sourceUrl);
         const { error: recordedError } = await supabase.rpc('record_drive_upload', { job_id: job.id, file_id: drive.id, file_url: drive.url });
         if (recordedError) throw new Error(recordedError.message);
       }
       const { error: finishError } = await supabase.rpc('finish_photo_transfer', { job_id: job.id, file_id: drive.id, file_url: drive.url });
-      const { error: removeError } = await supabase.storage.from('case-photos').remove([job.storage_path]);
+      const { error: removeError } = await supabase.storage.from('streetlight-photos').remove([job.storage_path]);
       if (removeError) throw new Error(`Drive upload succeeded but temporary deletion failed: ${removeError.message}`);
       if (finishError) throw new Error(finishError.message);
       results.push({ id: job.id, status: 'completed' });
