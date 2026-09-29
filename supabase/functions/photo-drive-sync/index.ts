@@ -9,27 +9,39 @@ function required(name: string) {
   return value;
 }
 
-async function uploadThroughGas(job: Job, signedUrl: string) {
+async function uploadThroughGas(job: Job, signedUrl: string, fileName: string) {
   const response = await fetch(required('GAS_PHOTO_UPLOAD_URL'), {
     method: 'POST', headers,
     body: JSON.stringify({ secret: required('GAS_PHOTO_UPLOAD_SECRET'), sourceUrl: signedUrl,
-      destination: job.destination, fileName: driveFileName(job) })
+      destination: job.destination, fileName })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.ok || !data.id || !data.url) throw new Error(`GAS Drive upload failed: ${data.error || response.statusText}`);
   return { id: String(data.id), url: String(data.url) };
 }
 
-function driveFileName(job: Job) {
+function backupDate(job: Job) {
   // Keep the backup date fixed to when the upload entered the queue, rather
   // than when a later retry happens.  This is Taiwan local calendar date.
-  const date = new Intl.DateTimeFormat('en-CA', {
+  return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date(job.created_at)).replaceAll('-', '');
+}
+
+async function driveFileName(job: Job, supabase: ReturnType<typeof createClient>) {
+  const date = backupDate(job);
   const match = job.storage_path.match(/^(?:repair-reports|base-surveys)\/(.+)_(before|after)\.[^/]+$/);
   if (match) {
     const side = match[2] === 'before' ? '前' : '後';
     return `${date}_${match[1]}_${side}.jpg`;
+  }
+  if (job.destination === 'replacement') {
+    const { data, error } = await supabase.from('replacement_history')
+      .select('streetlight_id').eq('id', job.record_id).single();
+    if (error) throw new Error(`Could not find replacement streetlight ID: ${error.message}`);
+    const streetlightId = String(data?.streetlight_id || '').trim();
+    if (!streetlightId) throw new Error('Could not find replacement streetlight ID');
+    return `${date}_${streetlightId}_置換.jpg`;
   }
   // Legacy replacement records retain a safe, traceable fallback name.
   return `${date}_${job.destination}_${job.record_id}_${job.slot}.jpg`;
@@ -48,7 +60,7 @@ Deno.serve(async (request) => {
       if (job.status !== 'drive_uploaded') {
         const publicPath = job.storage_path.split('/').map(encodeURIComponent).join('/');
         const sourceUrl = `${required('SUPABASE_URL')}/storage/v1/object/public/streetlight-photos/${publicPath}`;
-        drive = await uploadThroughGas(job, sourceUrl);
+        drive = await uploadThroughGas(job, sourceUrl, await driveFileName(job, supabase));
         const { error: recordedError } = await supabase.rpc('record_drive_upload', { job_id: job.id, file_id: drive.id, file_url: drive.url });
         if (recordedError) throw new Error(recordedError.message);
       }
