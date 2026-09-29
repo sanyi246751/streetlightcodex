@@ -211,13 +211,29 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
         let res: { date?: string; lat?: number; lng?: number } = {};
         let exifOff = -1;
         let gpsOff = -1;
+        let ifd0DateOff = -1;
+
+        const readExifDate = (valueOffset: number) => {
+            let value = "";
+            for (let j = 0; j < 19 && valueOffset + j < dv.byteLength; j++) {
+                value += String.fromCharCode(dv.getUint8(valueOffset + j));
+            }
+            const parts = value.split(" ");
+            return parts.length === 2
+                ? `${parts[0].replace(/:/g, "-")}T${parts[1].substring(0, 5)}`
+                : undefined;
+        };
 
         for (let i = 0; i < entries; i++) {
             const off = offset + 6 + ifd0Off + 2 + i * 12;
             const tag = dv.getUint16(off, little);
             if (tag === 0x8769) exifOff = dv.getUint32(off + 8, little);
             if (tag === 0x8825) gpsOff = dv.getUint32(off + 8, little);
+            // DateTime (0x0132) is commonly stored in IFD0, not ExifIFD.
+            if (tag === 0x0132) ifd0DateOff = dv.getUint32(off + 8, little) + offset + 6;
         }
+
+        if (ifd0DateOff !== -1) res.date = readExifDate(ifd0DateOff);
 
         if (exifOff !== -1) {
             const exifEntries = dv.getUint16(offset + 6 + exifOff, little);
@@ -226,12 +242,9 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
                 const tag = dv.getUint16(off, little);
                 if (tag === 0x9003 || tag === 0x0132) {
                     const valOff = dv.getUint32(off + 8, little) + offset + 6;
-                    let s = "";
-                    for (let j = 0; j < 19; j++) s += String.fromCharCode(dv.getUint8(valOff + j));
-                    const p = s.split(" ");
-                    if (p.length === 2) {
-                        res.date = p[0].replace(/:/g, "-") + "T" + p[1].substring(0, 5);
-                    }
+                    // Prefer DateTimeOriginal when the camera provides it.
+                    const parsedDate = readExifDate(valOff);
+                    if (parsedDate) res.date = parsedDate;
                 }
             }
         }
@@ -342,10 +355,17 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
                 let data = await extractEXIFFromLibrary(file);
 
                 // 若標準庫沒解析出來，則 fallback 到手寫二進位解析引擎
-                if (!data) {
-                    console.warn("[GPS] exif-js found no data, falling back to manual binary parser...");
+                if (!data || !data.date || data.lat === undefined || data.lng === undefined) {
+                    console.warn("[GPS] supplementing EXIF data with the manual binary parser...");
                     const buffer = await file.arrayBuffer();
-                    data = extractEXIFManual(buffer);
+                    const manualData = extractEXIFManual(buffer);
+                    if (manualData) {
+                        data = {
+                            date: data?.date || manualData.date,
+                            lat: data?.lat ?? manualData.lat,
+                            lng: data?.lng ?? manualData.lng,
+                        };
+                    }
                 }
 
                 if (data) {
