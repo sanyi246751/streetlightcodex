@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js';
 
 const headers = { 'Content-Type': 'application/json' };
-type Job = { id: number; storage_path: string; destination: 'base-survey' | 'replacement' | 'repair'; record_id: number; slot: string; status: string; drive_file_id?: string; drive_url?: string };
+type Job = { id: number; storage_path: string; destination: 'base-survey' | 'replacement' | 'repair'; record_id: number; slot: string; status: string; created_at: string; drive_file_id?: string; drive_url?: string };
 
 function required(name: string) {
   const value = Deno.env.get(name);
@@ -13,11 +13,26 @@ async function uploadThroughGas(job: Job, signedUrl: string) {
   const response = await fetch(required('GAS_PHOTO_UPLOAD_URL'), {
     method: 'POST', headers,
     body: JSON.stringify({ secret: required('GAS_PHOTO_UPLOAD_SECRET'), sourceUrl: signedUrl,
-      destination: job.destination, fileName: `${job.destination}-${job.record_id}-${job.slot}-${crypto.randomUUID()}.jpg` })
+      destination: job.destination, fileName: driveFileName(job) })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.ok || !data.id || !data.url) throw new Error(`GAS Drive upload failed: ${data.error || response.statusText}`);
   return { id: String(data.id), url: String(data.url) };
+}
+
+function driveFileName(job: Job) {
+  // Keep the backup date fixed to when the upload entered the queue, rather
+  // than when a later retry happens.  This is Taiwan local calendar date.
+  const date = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(job.created_at)).replaceAll('-', '');
+  const match = job.storage_path.match(/^(?:repair-reports|base-surveys)\/(.+)_(before|after)\.[^/]+$/);
+  if (match) {
+    const side = match[2] === 'before' ? '前' : '後';
+    return `${date}_${match[1]}_${side}.jpg`;
+  }
+  // Legacy replacement records retain a safe, traceable fallback name.
+  return `${date}_${job.destination}_${job.record_id}_${job.slot}.jpg`;
 }
 
 Deno.serve(async (request) => {
