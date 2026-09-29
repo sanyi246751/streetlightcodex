@@ -275,6 +275,14 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
 
     const extractEXIFFromLibrary = (file: File): Promise<{ date?: string, lat?: number, lng?: number } | null> => {
         return new Promise((resolve) => {
+            let completed = false;
+            let timeoutId: ReturnType<typeof setTimeout> | undefined;
+            const finish = (value: { date?: string, lat?: number, lng?: number } | null) => {
+                if (completed) return;
+                completed = true;
+                if (timeoutId !== undefined) clearTimeout(timeoutId);
+                resolve(value);
+            };
             try {
                 // @ts-ignore
                 EXIF.getData(file, function (this: any) {
@@ -316,14 +324,17 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
                     }
 
                     if (date || (finalLat && finalLng)) {
-                        resolve({ date, lat: finalLat, lng: finalLng });
+                        finish({ date, lat: finalLat, lng: finalLng });
                     } else {
-                        resolve(null);
+                        finish(null);
                     }
                 });
+                // Certain mobile WebViews never invoke exif-js's callback.
+                // Resolve so the built-in JPEG parser can take over instead.
+                if (!completed) timeoutId = setTimeout(() => finish(null), 1500);
             } catch (err) {
                 console.error("EXIF library parsing error:", err);
-                resolve(null);
+                finish(null);
             }
         });
     };
@@ -346,10 +357,11 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
         };
         reader.readAsDataURL(file);
 
-        // 🚀 2. 非同步、安全地在背景解析 GPS EXIF 資訊，絕不卡死照片載入！
-        if (type === 'pre') {
-            setIsLocating(true);
-            const reqId = ++gpsRequestIdRef.current;
+        // 兩張照片都讀取拍攝日期；照片 1 另外讀取 GPS 以定位路燈。
+        {
+            const isNumberPhoto = type === 'pre';
+            if (isNumberPhoto) setIsLocating(true);
+            const reqId = isNumberPhoto ? ++gpsRequestIdRef.current : gpsRequestIdRef.current;
             try {
                 // 優先使用 exif-js 標準庫解析
                 let data = await extractEXIFFromLibrary(file);
@@ -375,20 +387,20 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
                         showToast(`📅 自動校對拍照時間: ${data.date.replace("T", " ")}`);
                     }
                     // 更新座標與搜尋最近路燈
-                    if (data.lat && data.lng) {
+                    if (isNumberPhoto && data.lat !== undefined && data.lng !== undefined) {
                         if (reqId === gpsRequestIdRef.current) {
                             setGpsLat(data.lat);
                             setGpsLng(data.lng);
                             showToast("📍 成功讀取照片 GPS 座標");
                             findClosestLight(data.lat, data.lng);
                         }
-                    } else {
+                    } else if (isNumberPhoto) {
                         showToast("⚠️ 相片中沒有 GPS 座標資訊");
                         if (reqId === gpsRequestIdRef.current) {
                             setIsLocating(false);
                         }
                     }
-                } else {
+                } else if (isNumberPhoto) {
                     showToast("⚠️ 相片中沒有 GPS 座標資訊");
                     if (reqId === gpsRequestIdRef.current) {
                         setIsLocating(false);
@@ -396,7 +408,7 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
                 }
             } catch (err) {
                 console.error("EXIF Parsing Error:", err);
-                if (reqId === gpsRequestIdRef.current) {
+                if (isNumberPhoto && reqId === gpsRequestIdRef.current) {
                     setIsLocating(false);
                 }
             }
@@ -434,7 +446,7 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
     };
 
     const handleUpload = async () => {
-        if (!prePhoto && !postPhoto) return alert("請至少上傳一張照片");
+        if (!prePhotoFile || !postPhotoFile) return alert("請完成照片1與照片2後再上傳");
         if (!gpsLightId) return alert("請先給定或確認抓取到的路燈編號");
 
         setIsUploading(true);
@@ -495,7 +507,7 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
         }
     };
 
-    const isComplete = prePhoto || postPhoto;
+    const isComplete = !!prePhoto && !!postPhoto;
 
     return (
         <div className="repair-report-container">
@@ -558,7 +570,7 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
                                             <div className="report-upload-icon">照片上傳📷</div>
                                         ) : (
                                             <>
-                                                <button className="report-remove-btn" onClick={(e) => { e.stopPropagation(); setPrePhoto(null); }}>✕</button>
+                                                <button className="report-remove-btn" onClick={(e) => { e.stopPropagation(); setPrePhoto(null); setPrePhotoFile(null); }}>✕</button>
                                                 <img src={prePhoto} alt="pre" />
                                             </>
                                         )}
@@ -581,7 +593,7 @@ export default function BaseSurveyView({ onBack }: BaseSurveyViewProps) {
                                             <div className="report-upload-icon">照片上傳📷</div>
                                         ) : (
                                             <>
-                                                <button className="report-remove-btn" onClick={(e) => { e.stopPropagation(); setPostPhoto(null); }}>✕</button>
+                                                <button className="report-remove-btn" onClick={(e) => { e.stopPropagation(); setPostPhoto(null); setPostPhotoFile(null); }}>✕</button>
                                                 <img src={postPhoto} alt="post" />
                                             </>
                                         )}
