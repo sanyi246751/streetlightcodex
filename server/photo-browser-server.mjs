@@ -44,8 +44,8 @@ app.get('/api/lights', async (req, res, next) => {
           l.STREET AS street, l.LANE AS lane, l.ALLEY AS alley,
           l.ADD_NO AS addressNo, l.SLADD AS fullAddress, l.STYPE AS poleType,
           l.WAT AS watt, l.LampStatus AS lampStatus,
-          (SELECT COUNT(*) FROM dbo.IMG i WHERE i.LAMPID = l.LAMPID) AS photoCount,
-          (SELECT COUNT(*) FROM dbo.IMG_O io WHERE io.LAMPID = l.LAMPID) AS originalPhotoCount
+          (SELECT CASE WHEN COUNT(*) > 3 THEN 3 ELSE COUNT(*) END FROM dbo.IMG i WHERE i.LAMPID = l.LAMPID) AS photoCount,
+          0 AS originalPhotoCount
         FROM dbo.SanyiLamp l
         WHERE l.LAMP_NO LIKE @term ESCAPE '\\'
            OR l.VILLAGE LIKE @term ESCAPE '\\'
@@ -60,14 +60,10 @@ app.get('/api/lights/:lampId/photos', async (req, res, next) => {
   try {
     const db = await poolReady;
     const result = await db.request().input('lampId', sql.Int, req.params.lampId).query(`
-      SELECT 'current' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo,
+      SELECT TOP (3) 'current' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo,
              DATALENGTH(photo) AS bytes
       FROM dbo.IMG WHERE LAMPID = @lampId
-      UNION ALL
-      SELECT 'original' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo,
-             DATALENGTH(photo) AS bytes
-      FROM dbo.IMG_O WHERE LAMPID = @lampId
-      ORDER BY source, imageName`);
+      ORDER BY ImgID`);
     res.json({ items: result.recordset });
   } catch (error) { next(error); }
 });
@@ -81,14 +77,15 @@ app.get('/api/gallery', async (req, res, next) => {
       .input('offset', sql.Int, offset)
       .input('limit', sql.Int, limit)
       .query(`
-        WITH allPhotos AS (
-          SELECT 'current' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo, LAMPID AS lampId FROM dbo.IMG
-          UNION ALL
-          SELECT 'original' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo, LAMPID AS lampId FROM dbo.IMG_O
+        WITH rankedPhotos AS (
+          SELECT 'current' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo, LAMPID AS lampId,
+                 ROW_NUMBER() OVER (PARTITION BY LAMPID ORDER BY ImgID) AS photoOrder
+          FROM dbo.IMG
         )
         SELECT source, imageId, imageName, lampNo, lampId
-        FROM allPhotos
-        ORDER BY lampNo, source, imageId
+        FROM rankedPhotos
+        WHERE photoOrder <= 3
+        ORDER BY lampNo, imageId
         OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`);
     res.json({ items: result.recordset, offset, hasMore: result.recordset.length === limit });
   } catch (error) { next(error); }
