@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "clean": "rimraf dist",
     "lint": "tsc --noEmit",
-    "migrate:supabase": "node scripts/migrate-google-to-supabase.mjs"
+    "migrate:supabase": "node scripts/migrate-google-to-supabase.mjs",
+    "photos:build": "vite build",
+    "photos:server": "node server/photo-browser-server.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -22,6 +24,8 @@
     "leaflet.markercluster": "^1.5.3",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "mssql": "^12.2.0",
+    "msnodesqlv8": "^5.1.1",
     "msnodesqlv8": "^5.5.0",
     "mssql": "^12.7.2",
     "react": "^19.0.0",
