@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const sql = require('mssql/msnodesqlv8');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const distDir = path.resolve(__dirname, '..', 'dist');
+const distDir = path.resolve(__dirname, '..', 'photo-browser-dist');
 
 const app = express();
 const port = Number(process.env.PHOTO_BROWSER_PORT || 4174);
@@ -15,6 +15,7 @@ const port = Number(process.env.PHOTO_BROWSER_PORT || 4174);
 // source code.  This service only listens on this computer.
 const pool = new sql.ConnectionPool({
   connectionString: 'Driver={ODBC Driver 18 for SQL Server};Server=localhost\\SQLEXPRESS01;Database=sanyi_20201216;Trusted_Connection=Yes;TrustServerCertificate=Yes;',
+  requestTimeout: 120000,
   options: { trustedConnection: true },
 });
 const poolReady = pool.connect();
@@ -61,13 +62,35 @@ app.get('/api/lights/:lampId/photos', async (req, res, next) => {
     const result = await db.request().input('lampId', sql.Int, req.params.lampId).query(`
       SELECT 'current' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo,
              DATALENGTH(photo) AS bytes
-      FROM dbo.IMG WHERE LAMPID = @lampId AND photo IS NOT NULL
+      FROM dbo.IMG WHERE LAMPID = @lampId
       UNION ALL
       SELECT 'original' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo,
              DATALENGTH(photo) AS bytes
-      FROM dbo.IMG_O WHERE LAMPID = @lampId AND photo IS NOT NULL
+      FROM dbo.IMG_O WHERE LAMPID = @lampId
       ORDER BY source, imageName`);
     res.json({ items: result.recordset });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/gallery', async (req, res, next) => {
+  try {
+    const db = await poolReady;
+    const offset = Math.max(0, Number.parseInt(String(req.query.offset || '0'), 10) || 0);
+    const limit = Math.min(120, Math.max(1, Number.parseInt(String(req.query.limit || '80'), 10) || 80));
+    const result = await db.request()
+      .input('offset', sql.Int, offset)
+      .input('limit', sql.Int, limit)
+      .query(`
+        WITH allPhotos AS (
+          SELECT 'current' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo, LAMPID AS lampId FROM dbo.IMG
+          UNION ALL
+          SELECT 'original' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo, LAMPID AS lampId FROM dbo.IMG_O
+        )
+        SELECT source, imageId, imageName, lampNo, lampId
+        FROM allPhotos
+        ORDER BY lampNo, source, imageId
+        OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`);
+    res.json({ items: result.recordset, offset, hasMore: result.recordset.length === limit });
   } catch (error) { next(error); }
 });
 

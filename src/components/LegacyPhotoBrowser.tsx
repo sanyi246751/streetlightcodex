@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Image as ImageIcon, LoaderCircle, Search, X } from 'lucide-react';
+import { ArrowLeft, Images, Image as ImageIcon, LoaderCircle, Search, X } from 'lucide-react';
 
 type Light = {
   lampId: number; lampNo: string; village?: string; street?: string; lane?: string;
   alley?: string; addressNo?: string; fullAddress?: string; poleType?: string;
   watt?: string; photoCount: number; originalPhotoCount: number;
 };
-type Photo = { source: 'current' | 'original'; imageId: number; imageName: string; bytes: number };
+type Photo = { source: 'current' | 'original'; imageId: number; imageName: string; bytes?: number; lampNo?: string; lampId?: number };
 
 const photoUrl = (photo: Photo) => `/api/photos/${photo.source}/${photo.imageId}`;
 const number = new Intl.NumberFormat('zh-TW');
@@ -20,9 +20,27 @@ export default function LegacyPhotoBrowser({ onBack }: { onBack: () => void }) {
   const [photoLoading, setPhotoLoading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<Photo | null>(null);
+  const [gallery, setGallery] = useState<Photo[]>([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [galleryHasMore, setGalleryHasMore] = useState(true);
+  const [showGallery, setShowGallery] = useState(true);
+
+  const loadGallery = async (reset = false) => {
+    if (galleryLoading || (!reset && !galleryHasMore)) return;
+    setGalleryLoading(true); setError('');
+    const offset = reset ? 0 : gallery.length;
+    try {
+      const response = await fetch(`/api/gallery?offset=${offset}&limit=80`);
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      setGallery(reset ? data.items : (current) => [...current, ...data.items]);
+      setGalleryHasMore(data.hasMore);
+    } catch { setError('讀取所有照片時發生問題。'); }
+    finally { setGalleryLoading(false); }
+  };
 
   const runSearch = async (value = query) => {
-    setLoading(true); setError(''); setSelected(null); setPhotos([]);
+    setLoading(true); setError(''); setSelected(null); setPhotos([]); setShowGallery(String(value).trim().length === 0);
     try {
       const response = await fetch(`/api/lights?q=${encodeURIComponent(value)}`);
       if (!response.ok) throw new Error();
@@ -32,10 +50,10 @@ export default function LegacyPhotoBrowser({ onBack }: { onBack: () => void }) {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { void runSearch(''); }, []);
+  useEffect(() => { void runSearch(''); void loadGallery(true); }, []);
 
   const chooseLight = async (light: Light) => {
-    setSelected(light); setPhotos([]); setPhotoLoading(true); setError('');
+    setSelected(light); setPhotos([]); setPhotoLoading(true); setError(''); setShowGallery(false);
     try {
       const response = await fetch(`/api/lights/${light.lampId}/photos`);
       if (!response.ok) throw new Error();
@@ -60,6 +78,7 @@ export default function LegacyPhotoBrowser({ onBack }: { onBack: () => void }) {
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="燈號、村別、路段或地址" className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100" />
           <button className="rounded-xl bg-amber-500 px-3 text-white hover:bg-amber-600" title="搜尋"><Search size={20} /></button>
         </form>
+        <button onClick={() => { setSelected(null); setShowGallery(true); void loadGallery(gallery.length === 0); }} className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium ${showGallery ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}><Images size={18} />瀏覽所有路燈照片</button>
         <div className="mt-3 text-sm text-slate-500">{loading ? '搜尋中…' : `找到 ${number.format(items.length)} 筆（最多顯示 60 筆）`}</div>
         <div className="mt-3 space-y-2">
           {loading && <div className="flex justify-center p-8"><LoaderCircle className="animate-spin text-amber-500" /></div>}
@@ -70,9 +89,10 @@ export default function LegacyPhotoBrowser({ onBack }: { onBack: () => void }) {
         </div>
       </section>
       <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        {!selected && <div className="flex min-h-80 flex-col items-center justify-center text-center text-slate-500"><ImageIcon size={42} className="mb-3 text-slate-300" /><p className="font-medium">從左側選擇一支路燈</p><p className="mt-1 text-sm">可搜尋燈號、村別、路段或完整地址。</p></div>}
+        {showGallery && <><div className="border-b border-slate-100 pb-4"><div className="flex flex-wrap items-center gap-2"><h2 className="text-2xl font-bold">所有路燈照片</h2><span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">已載入 {number.format(gallery.length)} 張</span></div><p className="mt-2 text-sm text-slate-500">包含系統影像與原始影像；向下分批載入，點選可放大。</p></div><div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">{gallery.map((photo) => <button key={`${photo.source}-${photo.imageId}`} onClick={() => setPreview(photo)} className="group overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left hover:border-amber-400 hover:shadow-md"><img src={photoUrl(photo)} alt={photo.imageName} loading="lazy" className="aspect-square w-full object-cover transition duration-200 group-hover:scale-105" /><div className="p-2"><p className="truncate text-sm font-medium">{photo.lampNo || photo.imageName}</p><p className="truncate text-xs text-slate-500">{photo.imageName} · {photo.source === 'original' ? '原始影像' : '系統影像'}</p></div></button>)}</div>{galleryLoading ? <div className="flex justify-center gap-2 py-8 text-slate-500"><LoaderCircle className="animate-spin" />載入照片…</div> : galleryHasMore ? <div className="pt-6 text-center"><button onClick={() => void loadGallery()} className="rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-amber-600">載入更多照片</button></div> : <p className="py-8 text-center text-sm text-slate-500">已顯示所有照片。</p>}</>}
+        {!selected && !showGallery && <div className="flex min-h-80 flex-col items-center justify-center text-center text-slate-500"><ImageIcon size={42} className="mb-3 text-slate-300" /><p className="font-medium">從左側選擇一支路燈</p><p className="mt-1 text-sm">可搜尋燈號、村別、路段或完整地址。</p></div>}
         {selected && <><div className="border-b border-slate-100 pb-4"><div className="flex flex-wrap items-center gap-2"><h2 className="text-2xl font-bold">{selected.lampNo}</h2><span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">{photos.length} 張照片</span></div><p className="mt-2 text-slate-600">{address || '未登錄地址'}</p><p className="mt-1 text-sm text-slate-500">{[selected.poleType, selected.watt && `${selected.watt} W`].filter(Boolean).join(' · ')}</p></div>
-          {photoLoading ? <div className="flex min-h-64 items-center justify-center gap-2 text-slate-500"><LoaderCircle className="animate-spin" />讀取照片…</div> : photos.length === 0 ? <div className="p-12 text-center text-slate-500">此路燈沒有可顯示的照片。</div> : <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">{photos.map((photo) => <button key={`${photo.source}-${photo.imageId}`} onClick={() => setPreview(photo)} className="group overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left hover:border-amber-400 hover:shadow-md"><img src={photoUrl(photo)} alt={photo.imageName} loading="lazy" className="aspect-square w-full object-cover transition duration-200 group-hover:scale-105" /><div className="p-2"><p className="truncate text-sm font-medium">{photo.imageName}</p><p className="text-xs text-slate-500">{photo.source === 'original' ? '原始影像' : '系統影像'} · {Math.round(photo.bytes / 1024)} KB</p></div></button>)}</div>}
+          {photoLoading ? <div className="flex min-h-64 items-center justify-center gap-2 text-slate-500"><LoaderCircle className="animate-spin" />讀取照片…</div> : photos.length === 0 ? <div className="p-12 text-center text-slate-500">此路燈沒有可顯示的照片。</div> : <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">{photos.map((photo) => <button key={`${photo.source}-${photo.imageId}`} onClick={() => setPreview(photo)} className="group overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left hover:border-amber-400 hover:shadow-md"><img src={photoUrl(photo)} alt={photo.imageName} loading="lazy" className="aspect-square w-full object-cover transition duration-200 group-hover:scale-105" /><div className="p-2"><p className="truncate text-sm font-medium">{photo.imageName}</p><p className="text-xs text-slate-500">{photo.source === 'original' ? '原始影像' : '系統影像'} · {Math.round((photo.bytes || 0) / 1024)} KB</p></div></button>)}</div>}
         </>}
       </section>
     </div>
