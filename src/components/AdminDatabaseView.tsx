@@ -25,6 +25,8 @@ const TABLES: TableConfig[] = [
       { key: 'reported_at', label: '通報時間', type: 'datetime', required: true },
       { key: 'fault', label: '故障情形', type: 'textarea' }, { key: 'status', label: '維修情形', required: true },
       { key: 'repaired_at', label: '完成時間', type: 'datetime' }, { key: 'note', label: '備註', type: 'textarea' },
+      { key: 'before_photo_url', label: '維修前照片連結', type: 'url' },
+      { key: 'after_photo_url', label: '維修後照片連結', type: 'url' },
       { key: 'reporter_name', label: '通報人' }, { key: 'metadata', label: '原始資料／照片', type: 'json' },
       { key: 'created_at', label: '建立時間', type: 'datetime', readonly: true }
     ]

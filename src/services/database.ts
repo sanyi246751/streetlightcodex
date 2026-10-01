@@ -2,7 +2,17 @@ import type { HistoryRecord, RepairRecord, StreetLightLocation } from '../types'
 import { supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate, uploadCasePhoto } from '../lib/supabase';
 
 type StreetlightRow = { id: string; latitude: number; longitude: number; metadata?: Record<string, unknown> };
-type RepairRow = { id: number; streetlight_id: string; reported_at: string; fault: string; status: string; note?: string; metadata?: Record<string, unknown> };
+type RepairRow = {
+  id: number;
+  streetlight_id: string;
+  reported_at: string;
+  fault: string;
+  status: string;
+  note?: string;
+  before_photo_url?: string;
+  after_photo_url?: string;
+  metadata?: Record<string, unknown>;
+};
 
 export async function getStreetlights(): Promise<StreetLightLocation[]> {
   const rows = await supabaseSelectAll<StreetlightRow>('streetlights', 'select=id,latitude,longitude,metadata&order=id');
@@ -22,6 +32,8 @@ export async function getRepairRecords(): Promise<RepairRecord[]> {
     '通報時間': r.reported_at,
     '維修情形': r.status,
     '故障情形': r.fault,
+    '維修前照片連結': r.before_photo_url || '',
+    '維修後照片連結': r.after_photo_url || '',
     '備註': r.note || ''
   }));
 }
@@ -53,6 +65,7 @@ export async function completeRepair(id: string, note: string, dateStr: string, 
   // background sync can safely replace each slot with its Drive URL.
   await supabaseUpdate('repair_reports', `id=eq.${encodeURIComponent(id)}`, {
     status: '已查修', repaired_at: dateStr, note,
+    before_photo_url: null, after_photo_url: null,
     metadata: { photos: Array(photos.length * 2).fill(null) }
   });
   await Promise.all(photos.flatMap((p, i) => [
