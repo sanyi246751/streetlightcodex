@@ -32,9 +32,17 @@ Deno.serve(async (request) => {
     if (typeof table !== 'string' || !(table in allowedTables)) throw new Error('Unsupported backup table');
     const config = allowedTables[table as keyof typeof allowedTables];
     const supabase = createClient(required('SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'));
-    const { data, error } = await supabase.from(table).select(config.columns.join(',')).order(config.order.split('.')[0], { ascending: !config.order.endsWith('.desc') });
-    if (error) throw new Error(`Supabase read failed: ${error.message}`);
-    const rows = (data || []).map((row) => config.columns.map((column) => sheetValue(row[column])));
+    const pageSize = 1000;
+    const data: Record<string, unknown>[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data: page, error } = await supabase.from(table).select(config.columns.join(','))
+        .order(config.order.split('.')[0], { ascending: !config.order.endsWith('.desc') })
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(`Supabase read failed: ${error.message}`);
+      data.push(...(page || []));
+      if (!page || page.length < pageSize) break;
+    }
+    const rows = data.map((row) => config.columns.map((column) => sheetValue(row[column])));
     const response = await fetch(required('GAS_DATABASE_BACKUP_URL'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'database-backup', secret: required('GAS_DATABASE_BACKUP_SECRET'), sheetName: config.sheetName, headers: config.columns, rows }),

@@ -13,4 +13,4 @@ supabase secrets set GAS_DATABASE_BACKUP_URL="https://script.google.com/macros/s
 supabase secrets set GAS_DATABASE_BACKUP_SECRET="與 DATABASE_BACKUP_SECRET 相同的長隨機字串"
 ```
 
-每次按下管理頁的「備份至 Google Sheet」會覆寫該資料表對應的工作表內容；其他工作表不受影響。
+每次按下管理頁的「備份至 Google Sheet」會讀取所有資料頁面並覆寫該資料表對應的工作表內容；其他工作表不受影響。

@@ -10,6 +10,12 @@ var FOLDERS = {
   'repair': '1oDuIfD-zC-6GsbOLAv_BUCqyw4Kw01Xp'
 };
 
+// Run once manually from the Apps Script editor after updating this file.
+// It prompts the deployer to grant the Spreadsheet scope required by backups.
+function authorizeDatabaseBackup() {
+  return SpreadsheetApp.openById(BACKUP_SPREADSHEET_ID).getName();
+}
+
 function doPost(e) {
   try {
     var p = JSON.parse(e.postData.contents || '{}');
