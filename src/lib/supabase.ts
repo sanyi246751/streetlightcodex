@@ -62,6 +62,21 @@ export const supabaseDelete = (table: string, query: string) =>
     headers: { Prefer: 'return=minimal' }
   });
 
+export type GoogleSheetBackupResult = { ok: boolean; sheetName: string; rowCount: number; spreadsheetUrl?: string };
+
+/** Request a server-side, full-table backup to the configured Google Sheet. */
+export async function backupTableToGoogleSheet(table: string) {
+  if (!isSupabaseConfigured) throw new Error('Supabase 尚未設定');
+  const response = await fetch(`${url}/functions/v1/database-sheet-backup`, {
+    method: 'POST',
+    headers: headers({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ table })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.error || `Google Sheet 備份失敗 (${response.status})`);
+  return data as GoogleSheetBackupResult;
+}
+
 export type StoredPhoto = { path: string; url: string };
 
 export async function uploadDataUrl(dataUrl: string, folder: string): Promise<StoredPhoto> {

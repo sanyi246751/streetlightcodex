@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Database, Edit3, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
-import { supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate } from '../lib/supabase';
+import { ChevronLeft, Database, Edit3, FileSpreadsheet, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { backupTableToGoogleSheet, supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate } from '../lib/supabase';
 
 type FieldType = 'text' | 'number' | 'datetime' | 'textarea' | 'json' | 'url';
 type Field = { key: string; label: string; type?: FieldType; readonly?: boolean; required?: boolean };
@@ -105,6 +105,7 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
   const [editing, setEditing] = useState<Record<string, any> | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const loadRows = async () => {
@@ -190,6 +191,17 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
     } catch (e) { setError(e instanceof Error ? e.message : '刪除失敗'); }
   };
 
+  const backupToGoogleSheet = async () => {
+    setBackingUp(true); setError('');
+    try {
+      const result = await backupTableToGoogleSheet(config.table);
+      const target = result.spreadsheetUrl ? `，已寫入 ${result.spreadsheetUrl}` : '';
+      alert(`「${result.sheetName}」已備份 ${result.rowCount.toLocaleString()} 筆資料${target}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '備份至 Google Sheet 失敗');
+    } finally { setBackingUp(false); }
+  };
+
   return (
     <div className="h-[100dvh] bg-slate-100 text-slate-800 overflow-y-auto">
       <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-lg">
@@ -210,6 +222,7 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
           <div className="p-3 border-b border-slate-200 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
             <div className="relative flex-1 max-w-xl"><Search className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" /><input value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} placeholder={`搜尋${config.label}的所有欄位`} className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-cyan-500" /></div>
             <span className="text-sm text-slate-500 sm:ml-auto">共 {filtered.length.toLocaleString()} 筆</span>
+            <button onClick={() => void backupToGoogleSheet()} disabled={backingUp || loading} className="border border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"><FileSpreadsheet className="w-4 h-4" />{backingUp ? '備份中…' : '備份至 Google Sheet'}</button>
             <button onClick={openCreate} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><Plus className="w-4 h-4" />新增資料</button>
           </div>
 
