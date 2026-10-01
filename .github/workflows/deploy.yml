@@ -26,7 +26,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        # The repository also contains Windows-only local SQL Server tooling.
+        # Pages only builds the React site, so avoid running native install
+        # scripts on the Ubuntu deployment runner.
+        run: npm ci --ignore-scripts
 
       - name: Lint and Type Check
         run: npm run lint
