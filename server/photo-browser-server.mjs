@@ -41,9 +41,13 @@ app.get('/api/lights', async (req, res, next) => {
       .query(`
         SELECT TOP (60)
           l.LAMPID AS lampId, l.LAMP_NO AS lampNo, l.VILLAGE AS village,
-          l.STREET AS street, l.LANE AS lane, l.ALLEY AS alley,
+          l.Neighborhood AS neighborhood, l.STREET AS street, l.LANE AS lane, l.ALLEY AS alley,
           l.ADD_NO AS addressNo, l.SLADD AS fullAddress, l.STYPE AS poleType,
-          l.WAT AS watt, l.LampStatus AS lampStatus,
+          l.DIR AS direction, l.ADD_DIS AS addressDetail, l.SEAT AS fixturePosition,
+          l.HEIGHT AS height, l.MAT AS material, l.SMAT AS armMaterial, l.WAT AS watt,
+          l.ICOUNT AS fixtureCount, l.ADDMEMO AS addressMemo, l.NOTE AS note,
+          l.marksubname AS maintenanceArea, l.DAN AS circuit, l.LampStatus AS lampStatus,
+          l.lng AS longitude, l.lat AS latitude, l.UPDAY AS updatedAt,
           (SELECT CASE WHEN COUNT(*) > 3 THEN 3 ELSE COUNT(*) END FROM dbo.IMG i WHERE i.LAMPID = l.LAMPID) AS photoCount,
           0 AS originalPhotoCount
         FROM dbo.SanyiLamp l
@@ -78,8 +82,13 @@ app.get('/api/all-lights', async (req, res, next) => {
       .input('limit', sql.Int, limit)
       .query(`
         SELECT l.LAMPID AS lampId, l.LAMP_NO AS lampNo, l.VILLAGE AS village,
-               l.STREET AS street, l.ADD_NO AS addressNo, l.SLADD AS fullAddress,
-               l.STYPE AS poleType, l.WAT AS watt,
+               l.Neighborhood AS neighborhood, l.STREET AS street, l.LANE AS lane, l.ALLEY AS alley,
+               l.ADD_NO AS addressNo, l.SLADD AS fullAddress, l.STYPE AS poleType,
+               l.DIR AS direction, l.ADD_DIS AS addressDetail, l.SEAT AS fixturePosition,
+               l.HEIGHT AS height, l.MAT AS material, l.SMAT AS armMaterial, l.WAT AS watt,
+               l.ICOUNT AS fixtureCount, l.ADDMEMO AS addressMemo, l.NOTE AS note,
+               l.marksubname AS maintenanceArea, l.DAN AS circuit, l.LampStatus AS lampStatus,
+               l.lng AS longitude, l.lat AS latitude, l.UPDAY AS updatedAt,
                (SELECT TOP (3) ImgID AS imageId, ImgName AS imageName
                 FROM dbo.IMG i WHERE i.LAMPID = l.LAMPID ORDER BY ImgID FOR JSON PATH) AS photos
         FROM dbo.SanyiLamp l
@@ -89,6 +98,85 @@ app.get('/api/all-lights', async (req, res, next) => {
       ...light,
       photos: JSON.parse(light.photos || '[]').map((photo) => ({ ...photo, source: 'current', lampNo: light.lampNo })),
     })), offset, hasMore: result.recordset.length === limit });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/boxes', async (_req, res, next) => {
+  try {
+    const db = await poolReady;
+    const result = await db.request().query(`
+      SELECT BoxID AS boxId, BoxNO AS boxNo, Village AS village, Street AS street,
+             Lane AS lane, Alley AS alley, Add_no AS addressNo, Box_SLADD AS address,
+             Type AS boxType, Height AS height, Mainbranch AS mainBranch,
+             BoxStatus AS boxStatus, Box_Memo AS memo, BoxMark AS maintenanceArea, UPDAY AS updatedAt
+      FROM dbo.SanyiBox ORDER BY BoxNO`);
+    res.json({ items: result.recordset });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/repairs', async (_req, res, next) => {
+  try {
+    const db = await poolReady;
+    const result = await db.request().query(`
+      SELECT TOP (500) NT_ID AS repairId, NT_NO AS repairNo, LAMP_NO AS lampNo,
+             NT_ITEM AS repairItem, NT_MEMO AS memo, NT_DATE AS reportedAt,
+             NT_Address AS address, WK_ENDDATE AS dueDate, FSH_DATE AS finishedAt,
+             CHK_STATE AS checkStatus, NTClassification AS classification
+      FROM dbo.NOTIFY ORDER BY NT_DATE DESC, NT_ID DESC`);
+    res.json({ items: result.recordset });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/projects', async (_req, res, next) => {
+  try {
+    const db = await poolReady;
+    const result = await db.request().query(`
+      SELECT p.PRJID AS projectId, p.PRJYEAR AS projectYear, p.PRJNO AS projectNo,
+             p.PRJNAME AS projectName, p.PRJMONEY AS projectAmount, p.PRJSDATE AS startedAt,
+             p.PRJEDATE AS endedAt, p.WORKDAYS AS workDays, p.PrjStatus AS projectStatus,
+             c.COMPNAME AS companyName
+      FROM dbo.PROJECT p LEFT JOIN dbo.Company c ON c.CompID = p.COMPID
+      ORDER BY p.PRJYEAR DESC, p.PRJID DESC`);
+    res.json({ items: result.recordset });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/tables', async (_req, res, next) => {
+  try {
+    const db = await poolReady;
+    const result = await db.request().query(`
+      SELECT t.name AS tableName, SUM(p.rows) AS [rowCount]
+      FROM sys.tables t LEFT JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0, 1)
+      WHERE SCHEMA_NAME(t.schema_id) = N'dbo'
+      GROUP BY t.name ORDER BY t.name`);
+    res.json({ items: result.recordset });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/tables/:tableName', async (req, res, next) => {
+  try {
+    const db = await poolReady;
+    const tableName = String(req.params.tableName);
+    const offset = Math.max(0, Number.parseInt(String(req.query.offset || '0'), 10) || 0);
+    const tableResult = await db.request().input('tableName', sql.NVarChar(128), tableName).query(`
+      SELECT t.object_id FROM sys.tables t WHERE t.schema_id = SCHEMA_ID(N'dbo') AND t.name = @tableName`);
+    const objectId = tableResult.recordset[0]?.object_id;
+    if (!objectId) return res.status(404).json({ error: '找不到資料表' });
+    const columnResult = await db.request().input('objectId', sql.Int, objectId).query(`
+      SELECT c.name AS columnName, ty.name AS dataType, c.column_id AS columnNo
+      FROM sys.columns c JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+      WHERE c.object_id = @objectId ORDER BY c.column_id`);
+    const columns = columnResult.recordset;
+    const quote = (name) => `[${name.replace(/]/g, ']]')}]`;
+    const fields = columns.map(({ columnName, dataType }) => {
+      const lower = columnName.toLowerCase();
+      if (lower.includes('password') || lower === 'pswd') return `N'[已遮蔽]' AS ${quote(columnName)}`;
+      if (['varbinary', 'binary', 'image'].includes(dataType)) return `CONCAT(N'[二進位資料 ', COALESCE(CONVERT(nvarchar(20), DATALENGTH(${quote(columnName)})), N'0'), N' bytes]') AS ${quote(columnName)}`;
+      return quote(columnName);
+    }).join(', ');
+    const safeTable = quote(tableName);
+    const dataResult = await db.request().query(`SELECT ${fields} FROM dbo.${safeTable} ORDER BY (SELECT NULL) OFFSET ${offset} ROWS FETCH NEXT 500 ROWS ONLY`);
+    res.json({ tableName, columns: columns.map(({ columnName, dataType }) => ({ columnName, dataType })), rows: dataResult.recordset, offset, hasMore: dataResult.recordset.length === 500 });
   } catch (error) { next(error); }
 });
 
