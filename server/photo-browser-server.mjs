@@ -68,26 +68,27 @@ app.get('/api/lights/:lampId/photos', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-app.get('/api/gallery', async (req, res, next) => {
+app.get('/api/all-lights', async (req, res, next) => {
   try {
     const db = await poolReady;
     const offset = Math.max(0, Number.parseInt(String(req.query.offset || '0'), 10) || 0);
-    const limit = Math.min(120, Math.max(1, Number.parseInt(String(req.query.limit || '80'), 10) || 80));
+    const limit = Math.min(80, Math.max(1, Number.parseInt(String(req.query.limit || '40'), 10) || 40));
     const result = await db.request()
       .input('offset', sql.Int, offset)
       .input('limit', sql.Int, limit)
       .query(`
-        WITH rankedPhotos AS (
-          SELECT 'current' AS source, ImgID AS imageId, ImgName AS imageName, LampNo AS lampNo, LAMPID AS lampId,
-                 ROW_NUMBER() OVER (PARTITION BY LAMPID ORDER BY ImgID) AS photoOrder
-          FROM dbo.IMG
-        )
-        SELECT source, imageId, imageName, lampNo, lampId
-        FROM rankedPhotos
-        WHERE photoOrder <= 3
-        ORDER BY lampNo, imageId
+        SELECT l.LAMPID AS lampId, l.LAMP_NO AS lampNo, l.VILLAGE AS village,
+               l.STREET AS street, l.ADD_NO AS addressNo, l.SLADD AS fullAddress,
+               l.STYPE AS poleType, l.WAT AS watt,
+               (SELECT TOP (3) ImgID AS imageId, ImgName AS imageName
+                FROM dbo.IMG i WHERE i.LAMPID = l.LAMPID ORDER BY ImgID FOR JSON PATH) AS photos
+        FROM dbo.SanyiLamp l
+        ORDER BY l.LAMP_NO, l.LAMPID
         OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`);
-    res.json({ items: result.recordset, offset, hasMore: result.recordset.length === limit });
+    res.json({ items: result.recordset.map((light) => ({
+      ...light,
+      photos: JSON.parse(light.photos || '[]').map((photo) => ({ ...photo, source: 'current', lampNo: light.lampNo })),
+    })), offset, hasMore: result.recordset.length === limit });
   } catch (error) { next(error); }
 });
 
