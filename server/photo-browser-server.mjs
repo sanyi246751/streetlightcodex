@@ -10,15 +10,26 @@ const distDir = path.resolve(__dirname, '..', 'photo-browser-dist');
 
 const app = express();
 const port = Number(process.env.PHOTO_BROWSER_PORT || 4174);
+const host = process.env.PHOTO_BROWSER_HOST || '0.0.0.0';
+const sqlDriver = process.env.PHOTO_BROWSER_SQL_DRIVER || 'ODBC Driver 17 for SQL Server';
+const sqlServer = process.env.PHOTO_BROWSER_SQL_SERVER || 'localhost\\SQLEXPRESS';
+const sqlDatabase = process.env.PHOTO_BROWSER_SQL_DATABASE || 'sanyi_\u6aa2\u8996\u7528';
+const sqlEncrypt = process.env.PHOTO_BROWSER_SQL_ENCRYPT || 'No';
 
-// Windows integrated authentication means no database password is stored in
-// source code.  This service only listens on this computer.
+// Windows integrated authentication means no database password is stored in source code.
+// Set the PHOTO_BROWSER_* variables for each computer's local SQL Server installation.
 const pool = new sql.ConnectionPool({
-  connectionString: 'Driver={ODBC Driver 18 for SQL Server};Server=localhost\\SQLEXPRESS01;Database=sanyi_20201216;Trusted_Connection=Yes;TrustServerCertificate=Yes;',
+  connectionString: `Driver={${sqlDriver}};Server=${sqlServer};Database=${sqlDatabase};Trusted_Connection=Yes;TrustServerCertificate=Yes;Encrypt=${sqlEncrypt};`,
   requestTimeout: 120000,
   options: { trustedConnection: true },
 });
-const poolReady = pool.connect();
+// Start the web server even when the local SQL Server is temporarily unavailable.
+// Previously a rejected initial connection terminated Node before the browser could
+// load the UI, which appeared as a refused connection on port 4174.
+const poolReady = pool.connect().catch((error) => {
+  console.error('無法連線至本機 SQL Server；網站仍會啟動，資料 API 會回報連線錯誤。', error.message);
+  return null;
+});
 
 function searchPattern(value) {
   return `%${String(value || '').trim().replace(/[\\%_\[\]]/g, (char) => `\\${char}`)}%`;
@@ -89,8 +100,8 @@ app.get('/api/all-lights', async (req, res, next) => {
                l.ICOUNT AS fixtureCount, l.ADDMEMO AS addressMemo, l.NOTE AS note,
                l.marksubname AS maintenanceArea, l.DAN AS circuit, l.LampStatus AS lampStatus,
                l.lng AS longitude, l.lat AS latitude, l.UPDAY AS updatedAt,
-               (SELECT TOP (3) ImgID AS imageId, ImgName AS imageName
-                FROM dbo.IMG i WHERE i.LAMPID = l.LAMPID ORDER BY ImgID FOR JSON PATH) AS photos
+               N'[]' AS photos
+
         FROM dbo.SanyiLamp l
         ORDER BY l.LAMP_NO, l.LAMPID
         OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`);
@@ -199,9 +210,9 @@ app.get('/', (_req, res) => res.redirect('/streetlightcodex/#/photos'));
 
 app.use((error, _req, res, _next) => {
   console.error(error);
-  res.status(500).json({ error: '無法讀取本機 SQL Server 資料庫。請確認 SQLEXPRESS01 正在執行。' });
+  res.status(500).json({ error: '無法讀取本機 SQL Server 資料庫。請確認 SQLEXPRESS 正在執行，且 sanyi_檢視用 資料庫已掛載。' });
 });
 
-app.listen(port, '127.0.0.1', () => {
+app.listen(port, host, () => {
   console.log(`照片瀏覽器已啟動：http://127.0.0.1:${port}/streetlightcodex/#/photos`);
 });

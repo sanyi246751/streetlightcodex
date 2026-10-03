@@ -10,8 +10,7 @@
     "clean": "rimraf dist",
     "lint": "tsc --noEmit",
     "migrate:supabase": "node scripts/migrate-google-to-supabase.mjs",
-    "photos:build": "vite build --outDir photo-browser-dist",
-    "photos:server": "node server/photo-browser-server.mjs"
+    "photos:server:sqlserver": "node -r dotenv/config server/photo-browser-server.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

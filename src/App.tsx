@@ -10,7 +10,6 @@ import RepairReportView from './components/RepairReportView';
 import BaseSurveyView from './components/BaseSurveyView';
 import AdminDatabaseView from './components/AdminDatabaseView';
 import FaultReportView from './components/FaultReportView';
-import LegacyPhotoBrowser from './components/LegacyPhotoBrowser';
 import { StreetLightData } from './types';
 import { MapPin, Wrench, Settings, ClipboardCheck } from 'lucide-react';
 
@@ -34,7 +33,6 @@ function getRoleFromUrl(): UserRole {
 }
 
 export default function App() {
-  const isPhotoBrowser = window.location.hash.replace(/^#\/?/, '').split('/')[0] === 'photos';
   console.log("[App] Component initialized");
   const [role, setRole] = useState<UserRole>(null);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
@@ -129,10 +127,6 @@ export default function App() {
       window.location.hash = `/${selectedRole}`;
     }
   };
-
-  if (isPhotoBrowser) {
-    return <LegacyPhotoBrowser onBack={() => { window.location.hash = ''; window.location.reload(); }} />;
-  }
 
   // 如果還沒設定身分，就顯示選單
   if (role === null) {

@@ -19,6 +19,17 @@ function required(name: string) {
   return value;
 }
 
+function formatTaipeiDateTime(value: unknown) {
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return sheetValue(value);
+  const parts = new Intl.DateTimeFormat('zh-TW', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || '';
+  return `${get('year')}/${get('month')}/${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+}
+
 function sheetValue(value: unknown) {
   if (value === null || value === undefined) return '';
   return typeof value === 'object' ? JSON.stringify(value) : String(value);
@@ -42,7 +53,11 @@ Deno.serve(async (request) => {
       data.push(...(page || []));
       if (!page || page.length < pageSize) break;
     }
-    const rows = data.map((row) => config.columns.map((column) => sheetValue(row[column])));
+    const rows = data.map((row) => config.columns.map((column) =>
+      table === 'streetlights' && (column === 'created_at' || column === 'updated_at')
+        ? formatTaipeiDateTime(row[column])
+        : sheetValue(row[column])
+    ));
     const response = await fetch(required('GAS_DATABASE_BACKUP_URL'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'database-backup', secret: required('GAS_DATABASE_BACKUP_SECRET'), sheetName: config.sheetName, headers: config.columns, rows }),

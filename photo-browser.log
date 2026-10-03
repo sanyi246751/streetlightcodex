@@ -1,1 +1,6 @@
+
+> react-example@0.0.0 photos:server
+> node -r dotenv/config server/photo-browser-sqlite-server.mjs
+
+SQLite 資料庫已開啟：D:\where1223\AI\streetlightcodex\三義鄉路燈歷史照片瀏覽器\sanyi-history.sqlite
 照片瀏覽器已啟動：http://127.0.0.1:4174/streetlightcodex/#/photos
