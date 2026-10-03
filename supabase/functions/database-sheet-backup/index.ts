@@ -1,7 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js';
 
 const allowedTables = {
-  streetlights: { sheetName: '路燈主檔', order: 'id', columns: ['id', 'latitude', 'longitude', 'village_code', 'village_name', 'metadata', 'created_at', 'updated_at'] },
+  streetlights: {
+    sheetName: '路燈主檔', order: 'id',
+    columns: ['id', 'latitude', 'longitude', 'village_code', 'village_name', 'STREET', 'STYPE', 'SEAT', 'HEIGHT', 'metadata', 'created_at', 'updated_at'],
+    headers: ['路燈編號', '緯度', '經度', '村里代碼', '村里名稱', 'STREET（道路）', 'STYPE（桿型）', 'SEAT（座型）', 'HEIGHT（高度）', '原始資料', '建立時間', '更新時間'],
+  },
   repair_reports: { sheetName: '報修／查修', order: 'reported_at.desc', columns: ['id', 'streetlight_id', 'reported_at', 'fault', 'status', 'repaired_at', 'note', 'before_photo_url', 'after_photo_url', 'reporter_name', 'metadata', 'created_at'] },
   replacement_history: { sheetName: '置換歷程', order: 'created_at.desc', columns: ['id', 'streetlight_id', 'old_latitude', 'old_longitude', 'new_latitude', 'new_longitude', 'action', 'note', 'photo_url', 'created_at'] },
   base_surveys: { sheetName: '基座調查', order: 'surveyed_at.desc', columns: ['id', 'streetlight_id', 'surveyed_at', 'latitude', 'longitude', 'before_photo_url', 'after_photo_url', 'created_at'] },
@@ -42,6 +46,7 @@ Deno.serve(async (request) => {
     const { table } = await request.json();
     if (typeof table !== 'string' || !(table in allowedTables)) throw new Error('Unsupported backup table');
     const config = allowedTables[table as keyof typeof allowedTables];
+    const headers = 'headers' in config ? config.headers : config.columns;
     const supabase = createClient(required('SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'));
     const pageSize = 1000;
     const data: Record<string, unknown>[] = [];
@@ -60,7 +65,7 @@ Deno.serve(async (request) => {
     ));
     const response = await fetch(required('GAS_DATABASE_BACKUP_URL'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'database-backup', secret: required('GAS_DATABASE_BACKUP_SECRET'), sheetName: config.sheetName, headers: config.columns, rows }),
+      body: JSON.stringify({ action: 'database-backup', secret: required('GAS_DATABASE_BACKUP_SECRET'), sheetName: config.sheetName, headers, rows }),
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || !result.ok) throw new Error(`Google Sheet backup failed: ${result.error || response.statusText}`);
