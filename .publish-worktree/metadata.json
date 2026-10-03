@@ -1,0 +1,5 @@
+{
+  "name": "Sanyi Street Light Map",
+  "description": "A comprehensive map for querying and tracking street light locations and repair status in Sanyi.",
+  "requestFramePermissions": ["geolocation"]
+}
