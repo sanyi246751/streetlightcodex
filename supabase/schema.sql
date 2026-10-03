@@ -8,6 +8,10 @@ create table if not exists public.streetlights (
   longitude double precision not null,
   village_code text,
   village_name text,
+  "STREET" text,
+  "STYPE" text,
+  "SEAT" text,
+  "HEIGHT" text,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -27,6 +31,23 @@ create table if not exists public.repair_reports (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
+
+-- Historical lamp attributes are first-class columns so they can be queried,
+-- edited and exported directly instead of being hidden inside metadata.
+alter table public.streetlights add column if not exists "STREET" text;
+alter table public.streetlights add column if not exists "STYPE" text;
+alter table public.streetlights add column if not exists "SEAT" text;
+alter table public.streetlights add column if not exists "HEIGHT" text;
+
+-- One-time backfill for installations that previously stored these values in
+-- the original-data JSON. Existing column values are retained when present.
+update public.streetlights
+set
+  "STREET" = coalesce("STREET", metadata ->> 'STREET'),
+  "STYPE" = coalesce("STYPE", metadata ->> 'STYPE'),
+  "SEAT" = coalesce("SEAT", metadata ->> 'SEAT'),
+  "HEIGHT" = coalesce("HEIGHT", metadata ->> 'HEIGHT')
+where metadata ?| array['STREET', 'STYPE', 'SEAT', 'HEIGHT'];
 
 -- Supports projects created before repair photo links were separate columns.
 alter table public.repair_reports add column if not exists before_photo_url text;

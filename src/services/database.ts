@@ -1,7 +1,16 @@
 import type { HistoryRecord, RepairRecord, StreetLightLocation } from '../types';
 import { supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate, uploadCasePhoto } from '../lib/supabase';
 
-type StreetlightRow = { id: string; latitude: number; longitude: number; metadata?: Record<string, unknown> };
+type StreetlightRow = {
+  id: string;
+  latitude: number;
+  longitude: number;
+  metadata?: Record<string, unknown>;
+  STREET?: string | null;
+  STYPE?: string | null;
+  SEAT?: string | null;
+  HEIGHT?: string | null;
+};
 type RepairRow = {
   id: number;
   streetlight_id: string;
@@ -15,9 +24,13 @@ type RepairRow = {
 };
 
 export async function getStreetlights(): Promise<StreetLightLocation[]> {
-  const rows = await supabaseSelectAll<StreetlightRow>('streetlights', 'select=id,latitude,longitude,metadata&order=id');
+  const rows = await supabaseSelectAll<StreetlightRow>('streetlights', 'select=id,latitude,longitude,metadata,STREET,STYPE,SEAT,HEIGHT&order=id');
   return rows.map(r => ({
     ...(r.metadata || {}),
+    STREET: r.STREET ?? r.metadata?.STREET,
+    STYPE: r.STYPE ?? r.metadata?.STYPE,
+    SEAT: r.SEAT ?? r.metadata?.SEAT,
+    HEIGHT: r.HEIGHT ?? r.metadata?.HEIGHT,
     '原路燈號碼': r.id,
     '緯度Latitude': String(r.latitude),
     '經度Longitude': String(r.longitude)

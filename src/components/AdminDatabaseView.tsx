@@ -13,6 +13,8 @@ const TABLES: TableConfig[] = [
       { key: 'latitude', label: '緯度', type: 'number', required: true },
       { key: 'longitude', label: '經度', type: 'number', required: true },
       { key: 'village_code', label: '村里代碼' }, { key: 'village_name', label: '村里名稱' },
+      { key: 'STREET', label: 'STREET（道路）' }, { key: 'STYPE', label: 'STYPE（桿型）' },
+      { key: 'SEAT', label: 'SEAT（座型）' }, { key: 'HEIGHT', label: 'HEIGHT（高度）' },
       { key: 'metadata', label: '原始資料', type: 'json' },
       { key: 'created_at', label: '建立時間', type: 'datetime', readonly: true },
       { key: 'updated_at', label: '更新時間', type: 'datetime', readonly: true }
