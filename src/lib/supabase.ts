@@ -64,6 +64,16 @@ export const supabaseDelete = (table: string, query: string) =>
 
 export type GoogleSheetBackupResult = { ok: boolean; sheetName: string; rowCount: number; spreadsheetUrl?: string };
 
+/** Notify the maintenance LINE group after a fault report has been stored. */
+export async function notifyFaultReport(reportId: number) {
+  if (!isSupabaseConfigured) throw new Error('Supabase 尚未設定');
+  const response = await fetch(`${url}/functions/v1/line-fault-notification`, {
+    method: 'POST', headers: headers({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ reportId })
+  });
+  if (!response.ok) throw new Error(`LINE 通知失敗 (${response.status})`);
+}
+
 /** Request a server-side, full-table backup to the configured Google Sheet. */
 export async function backupTableToGoogleSheet(table: string) {
   if (!isSupabaseConfigured) throw new Error('Supabase 尚未設定');

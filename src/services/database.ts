@@ -1,5 +1,5 @@
 import type { HistoryRecord, RepairRecord, StreetLightLocation } from '../types';
-import { supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate, uploadCasePhoto } from '../lib/supabase';
+import { notifyFaultReport, supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate, uploadCasePhoto } from '../lib/supabase';
 
 type StreetlightRow = {
   id: string;
@@ -70,6 +70,12 @@ export async function createRepairReport(input: {
     reporter_name: input.reporterName.trim() || null,
     metadata: { phone: input.phone.trim() }
   });
+  // A notification failure must not discard a successfully submitted report.
+  try {
+    await notifyFaultReport(report.id);
+  } catch (error) {
+    console.error('[FaultReport] LINE notification failed:', error);
+  }
   return report;
 }
 
