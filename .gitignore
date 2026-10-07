@@ -31,3 +31,6 @@ Thumbs.db
 # env
 .env*
 !.env.example
+
+# Local-only historical photo browser and its large database backups
+三義鄉路燈歷史照片瀏覽器/
