@@ -149,6 +149,11 @@ export default function App() {
     }
 
     if (selectedRole) {
+      if (selectedRole === 'admin' && isAdminEntryPath()) {
+        setRole('admin');
+        setCurrentPage('map');
+        return;
+      }
       window.location.hash = `/${selectedRole}`;
     }
   };
