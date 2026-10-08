@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './RepairReportView.css';
-import { ChevronLeft } from 'lucide-react';
 // @ts-ignore
 import * as EXIF from 'exif-js';
 import { getStreetlights, saveBaseSurvey } from '../services/database';
 import { StreetLightLocation } from '../types';
+
+import { ChevronLeft } from 'lucide-react';
 
 // GAS WEB APP URL 供使用者日後自行替換
 
