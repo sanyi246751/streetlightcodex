@@ -236,6 +236,7 @@ export default function ReplaceLightView({ lights, villageData, onBack }: Replac
     }, [newLightEdit.lat, newLightEdit.lng, villageData, manualVillage]);
 
     useEffect(() => {
+        refreshLights();
         fetchHistory();
         getDeviceLocation({ updateDraft: false });
     }, []);

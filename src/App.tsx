@@ -14,8 +14,23 @@ import { StreetLightData } from './types';
 import { MapPin, Wrench, Settings, ClipboardCheck } from 'lucide-react';
 
 export type UserRole = 'officer' | 'maintenance' | 'admin' | 'survey' | null;
+type AppPage = 'map' | 'replace' | 'report' | 'faultReport' | 'survey' | 'database';
 
 const ROLE_ROUTES = ['officer', 'maintenance', 'survey', 'admin'] as const;
+const ENTRY_PAGES: Record<string, AppPage> = {
+  'replacement': 'replace',
+  'repair-report': 'report',
+  'fault-report': 'faultReport',
+  'base-survey': 'survey',
+  'admin/database': 'database',
+};
+
+function getEntryPageFromPath(): AppPage | null {
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+  const pathname = window.location.pathname.replace(/\/+$/, '');
+  const relativePath = pathname.startsWith(`${basePath}/`) ? pathname.slice(basePath.length + 1) : '';
+  return ENTRY_PAGES[relativePath] || null;
+}
 
 function isAdminEntryPath() {
   const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
@@ -30,9 +45,16 @@ function isLegacyIndexPath() {
 }
 
 function isFaultReportEntryPath() {
-  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
-  const pathname = window.location.pathname.replace(/\/+$/, '');
-  return pathname === `${basePath}/fault-report`;
+  return getEntryPageFromPath() === 'faultReport';
+}
+
+function isAdminProtectedEntryPath() {
+  const page = getEntryPageFromPath();
+  return page === 'replace' || page === 'database';
+}
+
+function isAdminLoginEntryPath() {
+  return isAdminEntryPath() || isAdminProtectedEntryPath();
 }
 
 function getRoleFromUrl(): UserRole {
@@ -48,7 +70,11 @@ function getRoleFromUrl(): UserRole {
   }
 
   // 根網址固定為承辦人員；獨立的 /admin/ 入口固定為管理單位。
-  return isAdminEntryPath() ? 'admin' : 'officer';
+  const entryPage = getEntryPageFromPath();
+  if (entryPage === 'replace' || entryPage === 'database' || isAdminEntryPath()) return 'admin';
+  if (entryPage === 'report') return 'maintenance';
+  if (entryPage === 'survey') return 'survey';
+  return 'officer';
 }
 
 function getFaultReportStreetlightId() {
@@ -63,7 +89,7 @@ export default function App() {
   console.log("[App] Component initialized");
   const [role, setRole] = useState<UserRole>(null);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'map' | 'replace' | 'report' | 'faultReport' | 'survey' | 'database'>('map');
+  const [currentPage, setCurrentPage] = useState<AppPage>('map');
   const [faultReportStreetlightId, setFaultReportStreetlightId] = useState('');
   const [lights, setLights] = useState<StreetLightData[]>([]);
   const [villageData, setVillageData] = useState<any>(null);
@@ -105,7 +131,8 @@ export default function App() {
     const syncRoleFromUrl = () => {
       const roleFromUrl = getRoleFromUrl();
       const pageFromUrl = window.location.hash.replace(/^#\/?/, '').split('/')[1]?.split('?')[0];
-      const isFaultReportEntry = isFaultReportEntryPath();
+      const entryPage = getEntryPageFromPath();
+      const isFaultReportEntry = entryPage === 'faultReport';
 
       if (roleFromUrl === 'admin') {
         const savedAuth = localStorage.getItem('sanyi_admin_auth');
@@ -119,7 +146,7 @@ export default function App() {
       }
 
       setRole(roleFromUrl);
-      setCurrentPage(isFaultReportEntry || pageFromUrl === 'fault-report' ? 'faultReport' : roleFromUrl === 'survey' ? 'survey' : 'map');
+      setCurrentPage(entryPage || (pageFromUrl === 'fault-report' ? 'faultReport' : roleFromUrl === 'survey' ? 'survey' : 'map'));
       setFaultReportStreetlightId(isFaultReportEntry || pageFromUrl === 'fault-report' ? getFaultReportStreetlightId() : '');
 
       // 僅將舊版 ?role=... 連結改寫成 hash 路由；根網址保留乾淨網址。
@@ -159,9 +186,9 @@ export default function App() {
     }
 
     if (selectedRole) {
-      if (selectedRole === 'admin' && isAdminEntryPath()) {
+      if (selectedRole === 'admin' && isAdminLoginEntryPath()) {
         setRole('admin');
-        setCurrentPage('map');
+        setCurrentPage(getEntryPageFromPath() || 'map');
         return;
       }
       window.location.hash = `/${selectedRole}`;
@@ -170,7 +197,7 @@ export default function App() {
 
   // 如果還沒設定身分，就顯示選單
   if (role === null) {
-    if (isAdminEntryPath()) {
+    if (isAdminLoginEntryPath()) {
       return (
         <div className="h-screen w-screen bg-[#FFF9F2] flex flex-col items-center justify-center p-6 text-slate-700 font-sans">
           <div className="w-full max-w-sm rounded-[2rem] bg-white p-8 text-center shadow-sm border-2 border-slate-100">
@@ -250,21 +277,29 @@ export default function App() {
     );
   }
 
+  const returnToMap = () => {
+    const entryPage = getEntryPageFromPath();
+    if (entryPage) {
+      window.location.assign(isAdminProtectedEntryPath() ? `${import.meta.env.BASE_URL}admin/` : import.meta.env.BASE_URL);
+      return;
+    }
+    setCurrentPage('map');
+  };
+
   return (
     <div className="h-screen w-screen overflow-hidden">
       {currentPage === 'map' ? (
         <StreetLightMap
           villageData={villageData}
           role={role}
-          onNavigateToReplace={(data) => {
+          onNavigateToReplace={() => {
             if (role === 'admin') {
-              setLights(data);
-              setCurrentPage('replace');
+              window.location.assign(`${import.meta.env.BASE_URL}replacement/`);
             }
           }}
-          onNavigateToReport={() => setCurrentPage('report')}
-          onNavigateToSurvey={() => setCurrentPage('survey')}
-          onNavigateToDatabase={() => role === 'admin' && setCurrentPage('database')}
+          onNavigateToReport={() => window.location.assign(`${import.meta.env.BASE_URL}repair-report/`)}
+          onNavigateToSurvey={() => window.location.assign(`${import.meta.env.BASE_URL}base-survey/`)}
+          onNavigateToDatabase={() => role === 'admin' && window.location.assign(`${import.meta.env.BASE_URL}admin/database/`)}
           onNavigateToFaultReport={(streetlightId) => {
             const normalizedStreetlightId = streetlightId?.trim() || '';
             const params = normalizedStreetlightId ? `?streetlightId=${encodeURIComponent(normalizedStreetlightId)}` : '';
@@ -275,26 +310,21 @@ export default function App() {
         <ReplaceLightView
           lights={lights}
           villageData={villageData}
-          onBack={() => setCurrentPage('map')}
+          onBack={returnToMap}
         />
       ) : currentPage === 'survey' ? (
         <BaseSurveyView
-          onBack={() => setCurrentPage('map')}
+          onBack={returnToMap}
         />
       ) : currentPage === 'database' ? (
-        <AdminDatabaseView onBack={() => setCurrentPage('map')} />
+        <AdminDatabaseView onBack={returnToMap} />
       ) : currentPage === 'faultReport' ? (
         <FaultReportView initialStreetlightId={faultReportStreetlightId} onBack={() => {
-          if (isFaultReportEntryPath()) {
-            window.location.assign(import.meta.env.BASE_URL);
-            return;
-          }
-          setCurrentPage('map');
-          window.location.hash = `/${role}`;
+          returnToMap();
         }} />
       ) : (
         <RepairReportView
-          onBack={() => setCurrentPage('map')}
+          onBack={returnToMap}
         />
       )}
     </div>
