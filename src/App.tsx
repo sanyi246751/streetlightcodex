@@ -23,6 +23,12 @@ function isAdminEntryPath() {
   return pathname === `${basePath}/admin`;
 }
 
+function isLegacyIndexPath() {
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+  const pathname = window.location.pathname.replace(/\/+$/, '');
+  return pathname === `${basePath}/index`;
+}
+
 function getRoleFromUrl(): UserRole {
   const hashRoute = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   if (ROLE_ROUTES.includes(hashRoute as Exclude<UserRole, null>)) {
@@ -106,11 +112,16 @@ export default function App() {
       setCurrentPage(pageFromUrl === 'fault-report' ? 'faultReport' : roleFromUrl === 'survey' ? 'survey' : 'map');
       setFaultReportStreetlightId(pageFromUrl === 'fault-report' ? getFaultReportStreetlightId() : '');
 
-      // 舊版 query string 自動轉成新的獨立頁面網址。
-      if (roleFromUrl && !window.location.hash) {
+      // 僅將舊版 ?role=... 連結改寫成 hash 路由；根網址保留乾淨網址。
+      const hasLegacyRole = new URLSearchParams(window.location.search).has('role');
+      if (roleFromUrl && hasLegacyRole && !window.location.hash) {
         const url = new URL(window.location.href);
         url.searchParams.delete('role');
         url.hash = `/${roleFromUrl}`;
+        window.history.replaceState({}, '', url);
+      } else if (roleFromUrl === 'officer' && !window.location.hash && isLegacyIndexPath()) {
+        const url = new URL(window.location.href);
+        url.pathname = `${(import.meta.env.BASE_URL || '/').replace(/\/+$/, '')}/`;
         window.history.replaceState({}, '', url);
       }
     };
