@@ -162,13 +162,6 @@ export default function StreetLightMap({
 
   const mapRef = useRef<L.Map | null>(null);
 
-  const roleDisplay = {
-    officer: { title: '承辦人員', color: 'bg-sky-600' },
-    maintenance: { title: '維修人員', color: 'bg-emerald-600' },
-    survey: { title: '路燈基座調查', color: 'bg-purple-600' },
-    admin: { title: '管理單位', color: 'bg-orange-500' },
-  }[role || 'officer'];
-
   useEffect(() => {
     async function fetchData() {
       try {
@@ -327,12 +320,6 @@ export default function StreetLightMap({
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-sans">
-      <div className="absolute top-4 left-4 z-[1000] overflow-hidden rounded-2xl bg-white/95 shadow-lg backdrop-blur border border-slate-200">
-        <div className={`${roleDisplay.color} px-3 py-2.5 text-sm font-black text-white whitespace-nowrap`}>
-          {roleDisplay.title}
-        </div>
-      </div>
-
       {/* Search Bar (Shown for all except maintenance - WAIT, user now wants maintenance to have same interface as officer, just no bottom-right) */}
       {role !== null && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-[260px] px-0">
@@ -487,7 +474,15 @@ export default function StreetLightMap({
         <MapController target={targetLocation} bounds={mapBounds} />
 
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="OpenStreetMap">
+          <LayersControl.BaseLayer checked name="內政部 TGOS 地圖">
+            <TileLayer
+              attribution='&copy; <a href="https://www.nlsc.gov.tw/">內政部國土測繪中心</a>'
+              url="https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}"
+              maxNativeZoom={19}
+              maxZoom={22}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="OpenStreetMap">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
