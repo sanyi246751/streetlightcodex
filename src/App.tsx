@@ -29,6 +29,12 @@ function isLegacyIndexPath() {
   return pathname === `${basePath}/index`;
 }
 
+function isFaultReportEntryPath() {
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+  const pathname = window.location.pathname.replace(/\/+$/, '');
+  return pathname === `${basePath}/fault-report`;
+}
+
 function getRoleFromUrl(): UserRole {
   const hashRoute = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   if (ROLE_ROUTES.includes(hashRoute as Exclude<UserRole, null>)) {
@@ -46,6 +52,9 @@ function getRoleFromUrl(): UserRole {
 }
 
 function getFaultReportStreetlightId() {
+  if (isFaultReportEntryPath()) {
+    return new URLSearchParams(window.location.search).get('streetlightId') || '';
+  }
   const queryString = window.location.hash.split('?')[1] || '';
   return new URLSearchParams(queryString).get('streetlightId') || '';
 }
@@ -96,6 +105,7 @@ export default function App() {
     const syncRoleFromUrl = () => {
       const roleFromUrl = getRoleFromUrl();
       const pageFromUrl = window.location.hash.replace(/^#\/?/, '').split('/')[1]?.split('?')[0];
+      const isFaultReportEntry = isFaultReportEntryPath();
 
       if (roleFromUrl === 'admin') {
         const savedAuth = localStorage.getItem('sanyi_admin_auth');
@@ -109,8 +119,8 @@ export default function App() {
       }
 
       setRole(roleFromUrl);
-      setCurrentPage(pageFromUrl === 'fault-report' ? 'faultReport' : roleFromUrl === 'survey' ? 'survey' : 'map');
-      setFaultReportStreetlightId(pageFromUrl === 'fault-report' ? getFaultReportStreetlightId() : '');
+      setCurrentPage(isFaultReportEntry || pageFromUrl === 'fault-report' ? 'faultReport' : roleFromUrl === 'survey' ? 'survey' : 'map');
+      setFaultReportStreetlightId(isFaultReportEntry || pageFromUrl === 'fault-report' ? getFaultReportStreetlightId() : '');
 
       // 僅將舊版 ?role=... 連結改寫成 hash 路由；根網址保留乾淨網址。
       const hasLegacyRole = new URLSearchParams(window.location.search).has('role');
@@ -257,10 +267,8 @@ export default function App() {
           onNavigateToDatabase={() => role === 'admin' && setCurrentPage('database')}
           onNavigateToFaultReport={(streetlightId) => {
             const normalizedStreetlightId = streetlightId?.trim() || '';
-            setFaultReportStreetlightId(normalizedStreetlightId);
-            setCurrentPage('faultReport');
             const params = normalizedStreetlightId ? `?streetlightId=${encodeURIComponent(normalizedStreetlightId)}` : '';
-            window.location.hash = `/${role}/fault-report${params}`;
+            window.location.assign(`${import.meta.env.BASE_URL}fault-report${params}`);
           }}
         />
       ) : currentPage === 'replace' ? (
@@ -277,6 +285,10 @@ export default function App() {
         <AdminDatabaseView onBack={() => setCurrentPage('map')} />
       ) : currentPage === 'faultReport' ? (
         <FaultReportView initialStreetlightId={faultReportStreetlightId} onBack={() => {
+          if (isFaultReportEntryPath()) {
+            window.location.assign(import.meta.env.BASE_URL);
+            return;
+          }
           setCurrentPage('map');
           window.location.hash = `/${role}`;
         }} />
