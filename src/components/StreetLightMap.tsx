@@ -5,7 +5,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import { StreetLightData, StreetLightLocation, RepairRecord } from '../types';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants';
 import { getRepairRecords, getStreetlights } from '../services/database';
-import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck, Database, House, Wrench } from 'lucide-react';
+import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck, Database, Wrench } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Fix for Leaflet default icon issues in React
@@ -142,7 +142,6 @@ export default function StreetLightMap({
   onNavigateToSurvey,
   onNavigateToDatabase,
   onNavigateToFaultReport,
-  onBackHome,
   villageData,
   role
 }: {
@@ -151,7 +150,6 @@ export default function StreetLightMap({
   onNavigateToSurvey?: () => void;
   onNavigateToDatabase?: () => void;
   onNavigateToFaultReport?: (streetlightId?: string) => void;
-  onBackHome?: () => void;
   villageData: any;
   role?: 'officer' | 'maintenance' | 'admin' | 'survey' | null;
 }) {
@@ -329,18 +327,10 @@ export default function StreetLightMap({
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden font-sans">
-      <div className="absolute top-4 left-4 z-[1000] flex items-center overflow-hidden rounded-2xl bg-white/95 shadow-lg backdrop-blur border border-slate-200">
+      <div className="absolute top-4 left-4 z-[1000] overflow-hidden rounded-2xl bg-white/95 shadow-lg backdrop-blur border border-slate-200">
         <div className={`${roleDisplay.color} px-3 py-2.5 text-sm font-black text-white whitespace-nowrap`}>
           {roleDisplay.title}
         </div>
-        <button
-          onClick={onBackHome}
-          className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors whitespace-nowrap"
-          aria-label="返回身分選擇首頁"
-        >
-          <House className="h-4 w-4" />
-          <span className="hidden sm:inline">回首頁</span>
-        </button>
       </div>
 
       {/* Search Bar (Shown for all except maintenance - WAIT, user now wants maintenance to have same interface as officer, just no bottom-right) */}

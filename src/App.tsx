@@ -17,6 +17,12 @@ export type UserRole = 'officer' | 'maintenance' | 'admin' | 'survey' | null;
 
 const ROLE_ROUTES = ['officer', 'maintenance', 'survey', 'admin'] as const;
 
+function isAdminEntryPath() {
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+  const pathname = window.location.pathname.replace(/\/+$/, '');
+  return pathname === `${basePath}/admin`;
+}
+
 function getRoleFromUrl(): UserRole {
   const hashRoute = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   if (ROLE_ROUTES.includes(hashRoute as Exclude<UserRole, null>)) {
@@ -29,7 +35,8 @@ function getRoleFromUrl(): UserRole {
     return legacyRole as Exclude<UserRole, null>;
   }
 
-  return null;
+  // 根網址固定為承辦人員；獨立的 /admin/ 入口固定為管理單位。
+  return isAdminEntryPath() ? 'admin' : 'officer';
 }
 
 function getFaultReportStreetlightId() {
@@ -137,6 +144,25 @@ export default function App() {
 
   // 如果還沒設定身分，就顯示選單
   if (role === null) {
+    if (isAdminEntryPath()) {
+      return (
+        <div className="h-screen w-screen bg-[#FFF9F2] flex flex-col items-center justify-center p-6 text-slate-700 font-sans">
+          <div className="w-full max-w-sm rounded-[2rem] bg-white p-8 text-center shadow-sm border-2 border-slate-100">
+            <div className="mx-auto mb-5 w-fit rounded-2xl bg-orange-100 p-4 text-[#FF8C69]"><Settings className="w-9 h-9" /></div>
+            <h1 className="text-2xl font-extrabold text-[#FF8C69]">管理單位</h1>
+            <p className="mt-3 text-sm leading-6 text-slate-400">請輸入管理單位專屬密碼以進入系統。</p>
+            <button
+              type="button"
+              onClick={() => handleRoleSelect('admin')}
+              className="mt-7 w-full rounded-2xl bg-[#FF8C69] px-5 py-3 font-bold text-white transition-colors hover:bg-[#f47b56]"
+            >
+              管理單位登入
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="h-screen w-screen bg-[#FFF9F2] flex flex-col items-center justify-center p-6 text-slate-700 font-sans">
         <h1 className="text-3xl font-extrabold text-[#FF8C69] mb-8">三義鄉公所路燈系統</h1>
@@ -219,11 +245,6 @@ export default function App() {
             setCurrentPage('faultReport');
             const params = normalizedStreetlightId ? `?streetlightId=${encodeURIComponent(normalizedStreetlightId)}` : '';
             window.location.hash = `/${role}/fault-report${params}`;
-          }}
-          onBackHome={() => {
-            setRole(null);
-            setCurrentPage('map');
-            window.location.hash = '';
           }}
         />
       ) : currentPage === 'replace' ? (
