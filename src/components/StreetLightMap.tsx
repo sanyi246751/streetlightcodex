@@ -5,7 +5,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import { StreetLightData, StreetLightLocation, RepairRecord } from '../types';
 import { DEFAULT_CENTER, DEFAULT_ZOOM } from '../constants';
 import { getRepairRecords, getStreetlights } from '../services/database';
-import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck, Database, House } from 'lucide-react';
+import { Search, AlertTriangle, Lightbulb, ExternalLink, X, Navigation, Settings, MapPin, ClipboardCheck, Database, House, Wrench } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Fix for Leaflet default icon issues in React
@@ -150,7 +150,7 @@ export default function StreetLightMap({
   onNavigateToReport?: () => void;
   onNavigateToSurvey?: () => void;
   onNavigateToDatabase?: () => void;
-  onNavigateToFaultReport?: () => void;
+  onNavigateToFaultReport?: (streetlightId?: string) => void;
   onBackHome?: () => void;
   villageData: any;
   role?: 'officer' | 'maintenance' | 'admin' | 'survey' | null;
@@ -268,6 +268,12 @@ export default function StreetLightMap({
       setSearchedLightId(null);
     }
   }, [lights]);
+
+  const openFaultReport = (streetlightId: string) => {
+    const reportUrl = new URL(window.location.href);
+    reportUrl.hash = `/${role}/fault-report?streetlightId=${encodeURIComponent(streetlightId)}`;
+    window.open(reportUrl.toString(), '_blank', 'noopener,noreferrer');
+  };
 
   const getReportDiffText = (reportDate?: Date) => {
     if (!reportDate) return "無通報時間";
@@ -565,6 +571,26 @@ export default function StreetLightMap({
                     <ExternalLink className="w-3 h-3" />
                     查看街景
                   </a>
+
+                  {(role === 'officer' || role === 'admin') && (
+
+                    <button
+
+                      type="button"
+
+                      onClick={() => openFaultReport(light.id)}
+
+                      className="flex w-full items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold transition-colors"
+
+                    >
+
+                      <Wrench className="w-3 h-3" />
+
+                      路燈報修
+
+                    </button>
+
+                  )}
                 </div>
               </div>
             </Popup>
@@ -605,6 +631,26 @@ export default function StreetLightMap({
                       <ExternalLink className="w-3 h-3" />
                       查看街景
                     </a>
+
+                    {(role === 'officer' || role === 'admin') && (
+
+                      <button
+
+                        type="button"
+
+                        onClick={() => openFaultReport(light.id)}
+
+                        className="flex w-full items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold transition-colors"
+
+                      >
+
+                        <Wrench className="w-3 h-3" />
+
+                        路燈報修
+
+                      </button>
+
+                    )}
                   </div>
                 </div>
               </Popup>

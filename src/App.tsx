@@ -32,11 +32,17 @@ function getRoleFromUrl(): UserRole {
   return null;
 }
 
+function getFaultReportStreetlightId() {
+  const queryString = window.location.hash.split('?')[1] || '';
+  return new URLSearchParams(queryString).get('streetlightId') || '';
+}
+
 export default function App() {
   console.log("[App] Component initialized");
   const [role, setRole] = useState<UserRole>(null);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [currentPage, setCurrentPage] = useState<'map' | 'replace' | 'report' | 'faultReport' | 'survey' | 'database'>('map');
+  const [faultReportStreetlightId, setFaultReportStreetlightId] = useState('');
   const [lights, setLights] = useState<StreetLightData[]>([]);
   const [villageData, setVillageData] = useState<any>(null);
 
@@ -76,7 +82,7 @@ export default function App() {
 
     const syncRoleFromUrl = () => {
       const roleFromUrl = getRoleFromUrl();
-      const pageFromUrl = window.location.hash.replace(/^#\/?/, '').split('/')[1];
+      const pageFromUrl = window.location.hash.replace(/^#\/?/, '').split('/')[1]?.split('?')[0];
 
       if (roleFromUrl === 'admin') {
         const savedAuth = localStorage.getItem('sanyi_admin_auth');
@@ -91,6 +97,7 @@ export default function App() {
 
       setRole(roleFromUrl);
       setCurrentPage(pageFromUrl === 'fault-report' ? 'faultReport' : roleFromUrl === 'survey' ? 'survey' : 'map');
+      setFaultReportStreetlightId(pageFromUrl === 'fault-report' ? getFaultReportStreetlightId() : '');
 
       // 舊版 query string 自動轉成新的獨立頁面網址。
       if (roleFromUrl && !window.location.hash) {
@@ -206,9 +213,12 @@ export default function App() {
           onNavigateToReport={() => setCurrentPage('report')}
           onNavigateToSurvey={() => setCurrentPage('survey')}
           onNavigateToDatabase={() => role === 'admin' && setCurrentPage('database')}
-          onNavigateToFaultReport={() => {
+          onNavigateToFaultReport={(streetlightId) => {
+            const normalizedStreetlightId = streetlightId?.trim() || '';
+            setFaultReportStreetlightId(normalizedStreetlightId);
             setCurrentPage('faultReport');
-            window.location.hash = `/${role}/fault-report`;
+            const params = normalizedStreetlightId ? `?streetlightId=${encodeURIComponent(normalizedStreetlightId)}` : '';
+            window.location.hash = `/${role}/fault-report${params}`;
           }}
           onBackHome={() => {
             setRole(null);
@@ -229,7 +239,7 @@ export default function App() {
       ) : currentPage === 'database' ? (
         <AdminDatabaseView onBack={() => setCurrentPage('map')} />
       ) : currentPage === 'faultReport' ? (
-        <FaultReportView onBack={() => {
+        <FaultReportView initialStreetlightId={faultReportStreetlightId} onBack={() => {
           setCurrentPage('map');
           window.location.hash = `/${role}`;
         }} />

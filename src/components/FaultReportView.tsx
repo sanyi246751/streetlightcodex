@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronLeft, Lightbulb, LoaderCircle, Phone, UserRound } from 'lucide-react';
 import { createRepairReport, getStreetlights } from '../services/database';
 
-export default function FaultReportView({ onBack }: { onBack: () => void }) {
+export default function FaultReportView({ onBack, initialStreetlightId = '' }: { onBack: () => void; initialStreetlightId?: string }) {
   const [streetlightId, setStreetlightId] = useState('');
   const [faultType, setFaultType] = useState('路燈不亮');
   const [faultDetail, setFaultDetail] = useState('');
@@ -12,6 +12,11 @@ export default function FaultReportView({ onBack }: { onBack: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setStreetlightId(initialStreetlightId);
+    setError('');
+  }, [initialStreetlightId]);
 
   useEffect(() => {
     getStreetlights()
