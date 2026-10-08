@@ -83,7 +83,7 @@ export default function FaultReportView({ onBack, initialStreetlightId = '' }: {
         <form onSubmit={handleSubmit} className="space-y-6 p-5 sm:p-8">
           <label className="block">
             <span className="mb-2 block font-bold text-slate-700">路燈編號 <span className="text-red-500">*</span></span>
-            <input list="streetlight-ids" value={streetlightId} onChange={e => { setStreetlightId(e.target.value); setError(''); }} required placeholder="例如：001" className="w-full rounded-2xl border-2 border-slate-200 px-4 py-3 text-lg outline-none focus:border-sky-500" />
+            <input list="streetlight-ids" value={streetlightId} onChange={e => { setStreetlightId(e.target.value); setError(''); }} required placeholder="請輸入5碼路燈號碼，例如:01001" className="w-full rounded-2xl border-2 border-slate-200 px-4 py-3 text-lg outline-none focus:border-sky-500" />
             <datalist id="streetlight-ids">{lightIds.map(id => <option value={id} key={id} />)}</datalist>
             {!knownLight && <span className="mt-2 block text-sm font-medium text-amber-600">目前查無此路燈編號</span>}
           </label>
