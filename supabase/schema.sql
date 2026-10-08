@@ -162,8 +162,8 @@ alter table public.photo_transfers enable row level security;
 -- Jobs are created only by the storage trigger and handled using the Edge
 -- Function service key; browsers must not be able to read or alter this queue.
 
--- Trigger an asynchronous attempt immediately after each accepted upload.  The
--- once-per-minute Cron job remains the durable retry path for failed jobs.
+-- Trigger an asynchronous attempt immediately after each accepted upload.
+-- Failed jobs are retried by the separately configured 10-minute Cron path.
 create or replace function public.request_photo_drive_sync()
 returns void language plpgsql security definer set search_path = public, net, vault as $$
 begin
@@ -214,8 +214,11 @@ create or replace function public.claim_photo_transfers(batch_size integer defau
 returns setof public.photo_transfers language sql security definer set search_path = public as $$
   with candidates as (
     select id from photo_transfers
-    where status in ('pending', 'failed', 'drive_uploaded')
-       or (status = 'processing' and updated_at < now() - interval '10 minutes')
+    where status = 'pending'
+       or (status in ('failed', 'drive_uploaded') and attempts < 4
+           and updated_at <= now() - interval '10 minutes')
+       or (status = 'processing' and attempts < 4
+           and updated_at < now() - interval '10 minutes')
     order by created_at for update skip locked limit greatest(1, least(batch_size, 25))
   ), claimed as (
     update photo_transfers p set status = case when p.status = 'drive_uploaded' then 'drive_uploaded' else 'processing' end, attempts = attempts + 1,
