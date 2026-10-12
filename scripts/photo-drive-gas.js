@@ -42,6 +42,19 @@ function backupDatabaseToSheet(p) {
   if (values[0].length) sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, values[0].length);
+  // The database backup sends repair photo cells as IMAGE() formulas.  Give
+  // them a predictable thumbnail area instead of shrinking to a text width.
+  var photoColumns = [];
+  p.headers.forEach(function (header, index) {
+    if (header === 'before_photo_url' || header === 'after_photo_url') photoColumns.push(index + 1);
+  });
+  if (photoColumns.length && p.rows.length) {
+    photoColumns.forEach(function (column) {
+      sheet.setColumnWidth(column, 140);
+      sheet.getRange(2, column, p.rows.length, 1).setHorizontalAlignment('center');
+    });
+    sheet.setRowHeights(2, p.rows.length, 100);
+  }
   SpreadsheetApp.flush();
   return json({ ok: true, spreadsheetUrl: spreadsheet.getUrl() });
 }

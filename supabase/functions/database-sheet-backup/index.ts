@@ -39,6 +39,28 @@ function sheetValue(value: unknown) {
   return typeof value === 'object' ? JSON.stringify(value) : String(value);
 }
 
+function repairPhotoValue(row: Record<string, unknown>, column: string) {
+  const directUrl = row[column];
+  if (directUrl) return directUrl;
+  const photos = (row.metadata as { photos?: unknown[] } | null)?.photos;
+  if (!Array.isArray(photos)) return null;
+  return photos[column === 'before_photo_url' ? 0 : 1] || null;
+}
+
+function photoPreviewUrl(value: unknown) {
+  const photoUrl = sheetValue(value);
+  const driveFileId = photoUrl.match(/drive\.google\.com\/file\/d\/([^/?#]+)/)?.[1]
+    || photoUrl.match(/[?&]id=([^&#]+)/)?.[1];
+  return driveFileId ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveFileId)}&sz=w1000` : photoUrl;
+}
+
+function sheetPhotoFormula(value: unknown) {
+  if (!value) return '';
+  // Google Sheets evaluates strings beginning with '=' as formulas.  Mode 4
+  // fixes a readable thumbnail size, matching the management-screen preview.
+  return `=IFERROR(IMAGE("${photoPreviewUrl(value).replace(/"/g, '""')}",4,100,140),"無法顯示照片")`;
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (request.method !== 'POST') return new Response(JSON.stringify({ ok: false, error: 'POST only' }), { status: 405, headers: cors });
@@ -58,11 +80,14 @@ Deno.serve(async (request) => {
       data.push(...(page || []));
       if (!page || page.length < pageSize) break;
     }
-    const rows = data.map((row) => config.columns.map((column) =>
-      table === 'streetlights' && (column === 'created_at' || column === 'updated_at')
+    const rows = data.map((row) => config.columns.map((column) => {
+      if (table === 'repair_reports' && (column === 'before_photo_url' || column === 'after_photo_url')) {
+        return sheetPhotoFormula(repairPhotoValue(row, column));
+      }
+      return table === 'streetlights' && (column === 'created_at' || column === 'updated_at')
         ? formatTaipeiDateTime(row[column])
-        : sheetValue(row[column])
-    ));
+        : sheetValue(row[column]);
+    }));
     const response = await fetch(required('GAS_DATABASE_BACKUP_URL'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'database-backup', secret: required('GAS_DATABASE_BACKUP_SECRET'), sheetName: config.sheetName, headers, rows }),

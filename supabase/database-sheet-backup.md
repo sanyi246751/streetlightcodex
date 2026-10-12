@@ -14,3 +14,5 @@ supabase secrets set GAS_DATABASE_BACKUP_SECRET="與 DATABASE_BACKUP_SECRET 相�
 ```
 
 每次按下管理頁的「備份至 Google Sheet」會讀取所有資料頁面並覆寫該資料表對應的工作表內容；其他工作表不受影響。
+
+「報修／查修」的維修前／後照片欄會寫入 Google Sheets `IMAGE()` 縮圖公式，並自動設定照片欄寬與列高。照片來源為 Google Drive 時，系統會將檢視頁網址轉成可嵌入的縮圖網址；尚未上傳照片的儲存格維持空白。

@@ -22,9 +22,8 @@ const TABLES: TableConfig[] = [
   },
   {
     table: 'repair_reports', label: '報修／查修', primaryKey: 'id', order: 'reported_at.desc', fields: [
-      { key: 'id', label: '流水號', readonly: true },
-      { key: 'streetlight_id', label: '路燈編號', required: true },
       { key: 'reported_at', label: '通報時間', type: 'datetime', required: true },
+      { key: 'streetlight_id', label: '路燈編號', required: true },
       { key: 'fault', label: '故障情形', type: 'textarea' }, { key: 'status', label: '維修情形', required: true },
       { key: 'repaired_at', label: '完成時間', type: 'datetime' }, { key: 'note', label: '備註', type: 'textarea' },
       { key: 'before_photo_url', label: '維修前照片連結', type: 'url' },
@@ -54,6 +53,7 @@ const TABLES: TableConfig[] = [
 ];
 
 const PAGE_SIZE = 50;
+const FAULT_OPTIONS = ['路燈不亮', '路燈閃爍', '白天仍亮', '燈具損壞', '燈桿傾斜或損壞', '電線外露', '其他'];
 const displayValue = (value: unknown) => {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'object') return JSON.stringify(value);
@@ -97,6 +97,22 @@ const repairPhotoUrl = (row: Record<string, any>, field: Field) => {
   return photos[field.key === 'before_photo_url' ? 0 : 1] || null;
 };
 
+// Photo transfers store Google Drive's human-facing `/view` link.  That page
+// cannot be used as an <img> source, so use Drive's image thumbnail endpoint
+// for on-screen previews while retaining the original URL in the database.
+const previewPhotoUrl = (value: unknown) => {
+  const photoUrl = String(value || '');
+  const driveFileId = photoUrl.match(/drive\.google\.com\/file\/d\/([^/?#]+)/)?.[1]
+    || photoUrl.match(/[?&]id=([^&#]+)/)?.[1];
+  return driveFileId ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveFileId)}&sz=w1600` : photoUrl;
+};
+
+function RepairPhotoThumbnail({ url, alt, onOpen }: { url: string; alt: string; onOpen: () => void }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <a href={url} target="_blank" rel="noreferrer" className="text-cyan-700 underline text-xs">無法載入，開啟原始照片</a>;
+  return <button type="button" onClick={onOpen} className="block h-14 w-20 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm hover:ring-2 hover:ring-cyan-500 focus:outline-none" title={`放大檢視${alt}`}><img src={previewPhotoUrl(url)} alt={alt} onError={() => setFailed(true)} className="h-full w-full object-cover" /></button>;
+}
+
 const repairDateValue = (value: unknown) => {
   if (!value) return null;
   const date = new Date(String(value));
@@ -118,6 +134,9 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
+  const [selectedRepairIds, setSelectedRepairIds] = useState<Set<string>>(new Set());
+  const [deletingSelected, setDeletingSelected] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<{ url: string; alt: string } | null>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
   const loadRows = async () => {
@@ -130,7 +149,7 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { setPage(1); setQuery(''); setDateFrom(''); setDateTo(''); loadRows(); }, [config]);
+  useEffect(() => { setPage(1); setQuery(''); setDateFrom(''); setDateTo(''); setSelectedRepairIds(new Set()); loadRows(); }, [config]);
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -168,6 +187,8 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
     const draft: Record<string, any> = {};
     config.fields.forEach(field => { draft[field.key] = inputValue(row[field.key], field.type); });
     draft.__originalKey = row[config.primaryKey];
+    // Older reports may have included an optional free-text suffix such as
+    // 「路燈不亮：巷口」.  Preserve it until the user selects a replacement.
     setIsNew(false); setEditing(draft);
   };
 
@@ -210,6 +231,39 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
     } catch (e) { setError(e instanceof Error ? e.message : '刪除失敗'); }
   };
 
+  const toggleRepairSelection = (id: unknown) => {
+    const key = String(id);
+    setSelectedRepairIds(current => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleVisibleRepairSelection = () => {
+    const ids = visibleRows.map(row => String(row[config.primaryKey]));
+    const allVisibleSelected = ids.length > 0 && ids.every(id => selectedRepairIds.has(id));
+    setSelectedRepairIds(current => {
+      const next = new Set(current);
+      ids.forEach(id => allVisibleSelected ? next.delete(id) : next.add(id));
+      return next;
+    });
+  };
+
+  const removeSelectedRepairs = async () => {
+    const ids = [...selectedRepairIds];
+    if (!ids.length) return;
+    if (!confirm(`確定刪除已選取的 ${ids.length} 筆報修／查修案件？此操作無法復原。`)) return;
+    setDeletingSelected(true); setError('');
+    try {
+      await Promise.all(ids.map(id => supabaseDelete('repair_reports', `id=eq.${encodeURIComponent(id)}`)));
+      setSelectedRepairIds(new Set());
+      await loadRows();
+    } catch (e) { setError(e instanceof Error ? e.message : '批次刪除失敗'); }
+    finally { setDeletingSelected(false); }
+  };
+
   const backupToGoogleSheet = async () => {
     setBackingUp(true); setError('');
     try {
@@ -231,7 +285,7 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
     const urls = [...new Set(filtered.flatMap(row => [
       repairPhotoUrl(row, { key: 'before_photo_url', label: '' }),
       repairPhotoUrl(row, { key: 'after_photo_url', label: '' })
-    ]).filter(Boolean).map(String))];
+    ]).filter(Boolean).map(previewPhotoUrl))];
     await Promise.all(urls.map(src => new Promise<void>(resolve => {
       const image = new Image();
       image.onload = () => resolve();
@@ -271,6 +325,7 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
               <button onClick={() => void printRepairReports()} disabled={loading || filtered.length === 0} className="border border-sky-600 text-sky-700 hover:bg-sky-50 px-3 py-2 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"><Printer className="w-4 h-4" />列印案件</button>
             </div>}
             <span className="text-sm text-slate-500 sm:ml-auto">共 {filtered.length.toLocaleString()} 筆</span>
+            {config.table === 'repair_reports' && <button onClick={() => void removeSelectedRepairs()} disabled={deletingSelected || selectedRepairIds.size === 0} className="border border-red-600 text-red-700 hover:bg-red-50 px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"><Trash2 className="w-4 h-4" />{deletingSelected ? '刪除中…' : `刪除已選 ${selectedRepairIds.size} 筆`}</button>}
             <button onClick={() => void backupToGoogleSheet()} disabled={backingUp || loading} className="border border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"><FileSpreadsheet className="w-4 h-4" />{backingUp ? '備份中…' : '備份至 Google Sheet'}</button>
             <button onClick={openCreate} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><Plus className="w-4 h-4" />新增資料</button>
           </div>
@@ -279,10 +334,13 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
           <div ref={tableScrollRef} className="overflow-auto h-[calc(100dvh-310px)] min-h-[300px]">
             {loading ? <div className="p-16 text-center text-slate-500">資料載入中…</div> : (
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-600 sticky top-0 z-10"><tr>{config.fields.filter(f => f.type !== 'json').map(f => <th key={f.key} className="px-3 py-3 text-left whitespace-nowrap bg-slate-50">{f.label}</th>)}<th className="px-3 py-3 text-right sticky right-0 bg-slate-50">操作</th></tr></thead>
-                <tbody>{visibleRows.map((row, index) => <tr key={`${row[config.primaryKey]}-${index}`} className="border-t border-slate-100 hover:bg-cyan-50/40">{config.fields.filter(f => f.type !== 'json').map(field => {
+                <thead className="bg-slate-50 text-slate-600 sticky top-0 z-10"><tr>{config.table === 'repair_reports' && <th className="px-3 py-3 bg-slate-50"><input type="checkbox" aria-label="全選本頁案件" checked={visibleRows.length > 0 && visibleRows.every(row => selectedRepairIds.has(String(row[config.primaryKey])))} onChange={toggleVisibleRepairSelection} /></th>}{config.fields.filter(f => f.type !== 'json').map(f => <th key={f.key} className="px-3 py-3 text-left whitespace-nowrap bg-slate-50">{f.label}</th>)}<th className="px-3 py-3 text-right sticky right-0 bg-slate-50">操作</th></tr></thead>
+                <tbody>{visibleRows.map((row, index) => <tr key={`${row[config.primaryKey]}-${index}`} className="border-t border-slate-100 hover:bg-cyan-50/40">{config.table === 'repair_reports' && <td className="px-3 py-2"><input type="checkbox" aria-label={`選取案件 ${displayValue(row[config.primaryKey])}`} checked={selectedRepairIds.has(String(row[config.primaryKey]))} onChange={() => toggleRepairSelection(row[config.primaryKey])} /></td>}{config.fields.filter(f => f.type !== 'json').map(field => {
                   const fieldValue = repairPhotoUrl(row, field);
-                  return <td key={field.key} className="px-3 py-2 max-w-[260px] truncate whitespace-nowrap" title={displayFieldValue(fieldValue, field.type)}>{field.type === 'url' && fieldValue ? <a href={String(fieldValue)} target="_blank" rel="noreferrer" className="text-cyan-700 underline">開啟連結</a> : displayFieldValue(fieldValue, field.type)}</td>;
+                  const isRepairPhoto = config.table === 'repair_reports' && (field.key === 'before_photo_url' || field.key === 'after_photo_url');
+                  const photoLabel = field.key === 'before_photo_url' ? '維修前照片' : '維修後照片';
+                  const photoAlt = `路燈 ${displayValue(row.streetlight_id)} ${photoLabel}`;
+                  return <td key={field.key} className="px-3 py-2 max-w-[260px] truncate whitespace-nowrap" title={displayFieldValue(fieldValue, field.type)}>{isRepairPhoto && fieldValue ? <RepairPhotoThumbnail url={String(fieldValue)} alt={photoAlt} onOpen={() => setPhotoPreview({ url: previewPhotoUrl(fieldValue), alt: photoAlt })} /> : isRepairPhoto ? <span className="text-xs text-slate-400">尚未上傳照片</span> : field.type === 'url' && fieldValue ? <a href={String(fieldValue)} target="_blank" rel="noreferrer" className="text-cyan-700 underline">開啟連結</a> : displayFieldValue(fieldValue, field.type)}</td>;
                 })}<td className="px-3 py-2 sticky right-0 bg-white whitespace-nowrap text-right"><button onClick={() => openEdit(row)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="編輯"><Edit3 className="w-4 h-4" /></button><button onClick={() => remove(row)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="刪除"><Trash2 className="w-4 h-4" /></button></td></tr>)}</tbody>
               </table>
             )}
@@ -295,24 +353,14 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
             <h1>路燈報修／查修案件清冊</h1>
             <p>通報時間：{printPeriod}　列印時間：{printDate(new Date().toISOString())}　共 {filtered.length.toLocaleString()} 筆</p>
           </header>
-          {filtered.length === 0 ? <p>此時間區間沒有報修／查修案件。</p> : <div className="print-report__list">
-            {filtered.map((row, index) => {
+          {filtered.length === 0 ? <p>此時間區間沒有報修／查修案件。</p> : <table className="print-report__table">
+            <thead><tr><th>通報時間</th><th>路燈編號</th><th>故障情形</th><th>維修情形</th><th>完成時間</th><th>備註</th><th>維修前照片連結</th><th>維修後照片連結</th><th>通報人</th></tr></thead>
+            <tbody>{filtered.map((row, index) => {
               const beforeUrl = repairPhotoUrl(row, { key: 'before_photo_url', label: '' });
               const afterUrl = repairPhotoUrl(row, { key: 'after_photo_url', label: '' });
-              return <article key={`${row.id}-${index}`} className="print-report__case">
-                <div className="print-report__case-title"><strong>{index + 1}. 路燈編號：{displayValue(row.streetlight_id)}</strong><span>案件 #{displayValue(row.id)}</span></div>
-                <dl className="print-report__details">
-                  <div><dt>通報時間</dt><dd>{printDate(row.reported_at)}</dd></div><div><dt>維修情形</dt><dd>{displayValue(row.status)}</dd></div>
-                  <div><dt>完成時間</dt><dd>{printDate(row.repaired_at)}</dd></div><div><dt>通報人</dt><dd>{displayValue(row.reporter_name)}</dd></div>
-                  <div className="print-report__wide"><dt>故障情形</dt><dd>{displayValue(row.fault)}</dd></div><div className="print-report__wide"><dt>維修備註</dt><dd>{displayValue(row.note)}</dd></div>
-                </dl>
-                <div className="print-report__photos">
-                  <figure><figcaption>維修前照片</figcaption>{beforeUrl ? <img src={String(beforeUrl)} alt={`路燈 ${displayValue(row.streetlight_id)} 維修前`} /> : <div className="print-report__empty-photo">未提供照片</div>}</figure>
-                  <figure><figcaption>維修後照片</figcaption>{afterUrl ? <img src={String(afterUrl)} alt={`路燈 ${displayValue(row.streetlight_id)} 維修後`} /> : <div className="print-report__empty-photo">未提供照片</div>}</figure>
-                </div>
-              </article>;
-            })}
-          </div>}
+              return <tr key={`${row.id}-${index}`}><td>{printDate(row.reported_at)}</td><td>{displayValue(row.streetlight_id)}</td><td>{displayValue(row.fault)}</td><td>{displayValue(row.status)}</td><td>{printDate(row.repaired_at)}</td><td>{displayValue(row.note)}</td><td>{beforeUrl ? <img src={previewPhotoUrl(beforeUrl)} alt={`路燈 ${displayValue(row.streetlight_id)} 維修前`} /> : '未提供照片'}</td><td>{afterUrl ? <img src={previewPhotoUrl(afterUrl)} alt={`路燈 ${displayValue(row.streetlight_id)} 維修後`} /> : '未提供照片'}</td><td>{displayValue(row.reporter_name)}</td></tr>;
+            })}</tbody>
+          </table>}
         </section>}
       </main>
 
@@ -320,9 +368,15 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
           <div className="px-5 py-4 border-b flex items-center"><h2 className="font-black text-lg">{isNew ? '新增' : '編輯'}{config.label}</h2><button onClick={() => setEditing(null)} className="ml-auto p-2 rounded-lg hover:bg-slate-100"><X /></button></div>
           <div className="p-5 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4">
-            {config.fields.map(field => <label key={field.key} className={field.type === 'textarea' || field.type === 'json' ? 'md:col-span-2' : ''}><span className="block text-sm font-bold text-slate-600 mb-1">{field.label}{field.required && <span className="text-red-500"> *</span>}</span>{field.type === 'textarea' || field.type === 'json' ? <textarea rows={field.type === 'json' ? 8 : 3} value={editing[field.key] ?? ''} disabled={field.readonly} onChange={e => setEditing({ ...editing, [field.key]: e.target.value })} className="w-full px-3 py-2 border rounded-xl font-mono text-sm disabled:bg-slate-100" /> : <input type={field.type === 'number' ? 'number' : field.type === 'datetime' ? 'datetime-local' : field.type === 'url' ? 'url' : 'text'} step={field.type === 'number' ? 'any' : undefined} value={editing[field.key] ?? ''} disabled={field.readonly || (!isNew && field.key === config.primaryKey)} onChange={e => setEditing({ ...editing, [field.key]: e.target.value })} className="w-full px-3 py-2 border rounded-xl disabled:bg-slate-100" />}</label>)}
+            {config.fields.filter(field => config.table !== 'repair_reports' || !['reported_at', 'streetlight_id', 'created_at', 'metadata'].includes(field.key)).map(field => <label key={field.key} className={field.type === 'textarea' || field.type === 'json' ? 'md:col-span-2' : ''}><span className="block text-sm font-bold text-slate-600 mb-1">{field.label}{field.required && <span className="text-red-500"> *</span>}</span>{config.table === 'repair_reports' && field.key === 'fault' ? <select value={editing[field.key] ?? ''} onChange={e => setEditing({ ...editing, [field.key]: e.target.value })} className="w-full px-3 py-2 border rounded-xl bg-white"><option value="" disabled>請選擇故障情形</option>{!FAULT_OPTIONS.includes(editing[field.key] ?? '') && editing[field.key] && <option value={editing[field.key]}>{editing[field.key]}（目前紀錄）</option>}{FAULT_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}</select> : config.table === 'repair_reports' && field.key === 'status' ? <select value={editing[field.key] ?? ''} onChange={e => setEditing({ ...editing, [field.key]: e.target.value })} className="w-full px-3 py-2 border rounded-xl bg-white"><option value="未查修">未查修</option><option value="已查修">已查修</option></select> : field.type === 'textarea' || field.type === 'json' ? <textarea rows={field.type === 'json' ? 8 : 3} value={editing[field.key] ?? ''} disabled={field.readonly} onChange={e => setEditing({ ...editing, [field.key]: e.target.value })} className="w-full px-3 py-2 border rounded-xl font-mono text-sm disabled:bg-slate-100" /> : <input type={field.type === 'number' ? 'number' : field.type === 'datetime' ? 'datetime-local' : field.type === 'url' ? 'url' : 'text'} step={field.type === 'number' ? 'any' : undefined} value={editing[field.key] ?? ''} disabled={field.readonly || (!isNew && field.key === config.primaryKey)} onChange={e => setEditing({ ...editing, [field.key]: e.target.value })} className="w-full px-3 py-2 border rounded-xl disabled:bg-slate-100" />}</label>)}
           </div>
           <div className="px-5 py-4 border-t flex justify-end gap-2"><button onClick={() => setEditing(null)} className="px-4 py-2 border rounded-xl">取消</button><button onClick={save} disabled={saving} className="px-5 py-2 bg-cyan-600 text-white rounded-xl font-bold disabled:opacity-50">{saving ? '儲存中…' : '儲存'}</button></div>
+        </div>
+      </div>}
+      {photoPreview && <div className="fixed inset-0 z-[3100] bg-slate-950/85 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-label={photoPreview.alt} onMouseDown={e => { if (e.target === e.currentTarget) setPhotoPreview(null); }}>
+        <div className="relative max-h-full max-w-5xl">
+          <button type="button" onClick={() => setPhotoPreview(null)} className="absolute -right-2 -top-2 z-10 rounded-full bg-white p-2 text-slate-800 shadow-lg hover:bg-slate-100" aria-label="關閉照片"><X className="h-5 w-5" /></button>
+          <img src={photoPreview.url} alt={photoPreview.alt} className="max-h-[90vh] max-w-full rounded-xl object-contain shadow-2xl" />
         </div>
       </div>}
     </div>
