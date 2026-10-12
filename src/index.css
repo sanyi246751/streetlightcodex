@@ -83,3 +83,83 @@ body,
   font-weight: 800 !important;
   text-shadow: 1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  #root > div {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .print-report {
+    display: block !important;
+    font-family: "Noto Sans TC", Arial, sans-serif;
+    font-size: 10pt;
+  }
+
+  .print-report__header {
+    border-bottom: 2px solid #111;
+    margin-bottom: 5mm;
+    padding-bottom: 3mm;
+  }
+
+  .print-report__header h1 {
+    font-size: 18pt;
+    margin: 0 0 2mm;
+  }
+
+  .print-report__header p {
+    margin: 0;
+    color: #333;
+  }
+
+  .print-report__case {
+    border: 1px solid #555;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0 0 6mm;
+    padding: 4mm;
+  }
+
+  .print-report__case-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 5mm;
+    border-bottom: 1px solid #bbb;
+    padding-bottom: 2mm;
+    margin-bottom: 3mm;
+  }
+
+  .print-report__details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2mm 5mm;
+    margin: 0 0 4mm;
+  }
+
+  .print-report__details div { display: grid; grid-template-columns: 20mm 1fr; gap: 2mm; }
+  .print-report__details dt { color: #444; }
+  .print-report__details dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .print-report__details .print-report__wide { grid-column: 1 / -1; }
+
+  .print-report__photos { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .print-report__photos figure { margin: 0; min-width: 0; }
+  .print-report__photos figcaption { font-weight: 700; margin-bottom: 2mm; }
+  .print-report__photos img, .print-report__empty-photo {
+    box-sizing: border-box;
+    width: 100%;
+    height: 62mm;
+    border: 1px solid #777;
+    object-fit: contain;
+  }
+  .print-report__empty-photo { display: grid; place-items: center; color: #666; }
+}

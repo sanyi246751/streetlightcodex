@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Database, Edit3, FileSpreadsheet, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { ChevronLeft, Database, Edit3, FileSpreadsheet, Plus, Printer, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { backupTableToGoogleSheet, supabaseDelete, supabaseInsert, supabaseSelectAll, supabaseUpdate } from '../lib/supabase';
 
 type FieldType = 'text' | 'number' | 'datetime' | 'textarea' | 'json' | 'url';
@@ -97,12 +97,22 @@ const repairPhotoUrl = (row: Record<string, any>, field: Field) => {
   return photos[field.key === 'before_photo_url' ? 0 : 1] || null;
 };
 
+const repairDateValue = (value: unknown) => {
+  if (!value) return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const printDate = (value: unknown) => displayFieldValue(value, 'datetime');
+
 export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
   const [config, setConfig] = useState(TABLES[0]);
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Record<string, any> | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -120,13 +130,20 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { setPage(1); setQuery(''); loadRows(); }, [config]);
+  useEffect(() => { setPage(1); setQuery(''); setDateFrom(''); setDateTo(''); loadRows(); }, [config]);
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    if (!keyword) return rows;
-    return rows.filter(row => config.fields.some(field => displayValue(row[field.key]).toLowerCase().includes(keyword)));
-  }, [rows, query, config]);
+    const start = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+    const end = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
+    return rows.filter(row => {
+      const matchesKeyword = !keyword || config.fields.some(field => displayValue(row[field.key]).toLowerCase().includes(keyword));
+      if (!matchesKeyword) return false;
+      if (config.table !== 'repair_reports' || (!start && !end)) return true;
+      const reportedAt = repairDateValue(row.reported_at);
+      return !!reportedAt && (!start || reportedAt >= start) && (!end || reportedAt <= end);
+    });
+  }, [rows, query, config, dateFrom, dateTo]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visibleRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
@@ -204,9 +221,33 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
     } finally { setBackingUp(false); }
   };
 
+  const printRepairReports = async () => {
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      setError('結束日期不可早於起始日期。');
+      return;
+    }
+    // Preload first so the browser's print preview receives the actual photos,
+    // rather than an unloaded placeholder from the screen-only report section.
+    const urls = [...new Set(filtered.flatMap(row => [
+      repairPhotoUrl(row, { key: 'before_photo_url', label: '' }),
+      repairPhotoUrl(row, { key: 'after_photo_url', label: '' })
+    ]).filter(Boolean).map(String))];
+    await Promise.all(urls.map(src => new Promise<void>(resolve => {
+      const image = new Image();
+      image.onload = () => resolve();
+      image.onerror = () => resolve();
+      image.src = src;
+    })));
+    window.print();
+  };
+
+  const printPeriod = dateFrom || dateTo
+    ? `${dateFrom || '最早'} 至 ${dateTo || '最新'}`
+    : '全部期間';
+
   return (
     <div className="h-[100dvh] bg-slate-100 text-slate-800 overflow-y-auto">
-      <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-lg">
+      <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-lg print:hidden">
         <div className="max-w-[1600px] mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={onBack} className="p-2 rounded-xl hover:bg-white/10" aria-label="返回地圖"><ChevronLeft /></button>
           <Database className="text-cyan-400" />
@@ -216,19 +257,25 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
       </header>
 
       <main className="max-w-[1600px] mx-auto p-3 md:p-6">
-        <div className="flex gap-2 overflow-x-auto pb-3">
+        <div className="flex gap-2 overflow-x-auto pb-3 print:hidden">
           {TABLES.map(item => <button key={item.table} onClick={() => setConfig(item)} className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap ${config.table === item.table ? 'bg-cyan-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200'}`}>{item.label}</button>)}
         </div>
 
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print:hidden">
           <div className="p-3 border-b border-slate-200 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
             <div className="relative flex-1 max-w-xl"><Search className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" /><input value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} placeholder={`搜尋${config.label}的所有欄位`} className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-cyan-500" /></div>
+            {config.table === 'repair_reports' && <div className="flex flex-wrap items-center gap-2 text-sm">
+              <label className="flex items-center gap-1 text-slate-600">通報日期<input aria-label="通報起始日期" type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="border border-slate-300 rounded-lg px-2 py-2" /></label>
+              <span className="text-slate-400">至</span>
+              <input aria-label="通報結束日期" type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="border border-slate-300 rounded-lg px-2 py-2" />
+              <button onClick={() => void printRepairReports()} disabled={loading || filtered.length === 0} className="border border-sky-600 text-sky-700 hover:bg-sky-50 px-3 py-2 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"><Printer className="w-4 h-4" />列印案件</button>
+            </div>}
             <span className="text-sm text-slate-500 sm:ml-auto">共 {filtered.length.toLocaleString()} 筆</span>
             <button onClick={() => void backupToGoogleSheet()} disabled={backingUp || loading} className="border border-emerald-600 text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"><FileSpreadsheet className="w-4 h-4" />{backingUp ? '備份中…' : '備份至 Google Sheet'}</button>
             <button onClick={openCreate} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-xl font-bold flex items-center justify-center gap-2"><Plus className="w-4 h-4" />新增資料</button>
           </div>
 
-          {error && <div className="m-3 p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-sm break-all">{error}</div>}
+          {error && <div className="m-3 p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-sm break-all print:hidden">{error}</div>}
           <div ref={tableScrollRef} className="overflow-auto h-[calc(100dvh-310px)] min-h-[300px]">
             {loading ? <div className="p-16 text-center text-slate-500">資料載入中…</div> : (
               <table className="w-full text-sm">
@@ -242,6 +289,31 @@ export default function AdminDatabaseView({ onBack }: { onBack: () => void }) {
           </div>
           <div className="p-3 border-t border-slate-200 bg-white flex items-center justify-center gap-3"><button disabled={page <= 1} onClick={() => changePage(page - 1)} className="px-4 py-2 border rounded-lg disabled:opacity-30 font-bold">上一頁</button><label className="text-sm flex items-center gap-1">第 <select value={page} onChange={e => changePage(Number(e.target.value))} className="px-2 py-1.5 text-center border rounded-lg">{Array.from({ length: pageCount }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select>／{pageCount} 頁</label><button disabled={page >= pageCount} onClick={() => changePage(page + 1)} className="px-4 py-2 border rounded-lg disabled:opacity-30 font-bold">下一頁</button></div>
         </section>
+
+        {config.table === 'repair_reports' && <section className="hidden print:block print-report text-black">
+          <header className="print-report__header">
+            <h1>路燈報修／查修案件清冊</h1>
+            <p>通報時間：{printPeriod}　列印時間：{printDate(new Date().toISOString())}　共 {filtered.length.toLocaleString()} 筆</p>
+          </header>
+          {filtered.length === 0 ? <p>此時間區間沒有報修／查修案件。</p> : <div className="print-report__list">
+            {filtered.map((row, index) => {
+              const beforeUrl = repairPhotoUrl(row, { key: 'before_photo_url', label: '' });
+              const afterUrl = repairPhotoUrl(row, { key: 'after_photo_url', label: '' });
+              return <article key={`${row.id}-${index}`} className="print-report__case">
+                <div className="print-report__case-title"><strong>{index + 1}. 路燈編號：{displayValue(row.streetlight_id)}</strong><span>案件 #{displayValue(row.id)}</span></div>
+                <dl className="print-report__details">
+                  <div><dt>通報時間</dt><dd>{printDate(row.reported_at)}</dd></div><div><dt>維修情形</dt><dd>{displayValue(row.status)}</dd></div>
+                  <div><dt>完成時間</dt><dd>{printDate(row.repaired_at)}</dd></div><div><dt>通報人</dt><dd>{displayValue(row.reporter_name)}</dd></div>
+                  <div className="print-report__wide"><dt>故障情形</dt><dd>{displayValue(row.fault)}</dd></div><div className="print-report__wide"><dt>維修備註</dt><dd>{displayValue(row.note)}</dd></div>
+                </dl>
+                <div className="print-report__photos">
+                  <figure><figcaption>維修前照片</figcaption>{beforeUrl ? <img src={String(beforeUrl)} alt={`路燈 ${displayValue(row.streetlight_id)} 維修前`} /> : <div className="print-report__empty-photo">未提供照片</div>}</figure>
+                  <figure><figcaption>維修後照片</figcaption>{afterUrl ? <img src={String(afterUrl)} alt={`路燈 ${displayValue(row.streetlight_id)} 維修後`} /> : <div className="print-report__empty-photo">未提供照片</div>}</figure>
+                </div>
+              </article>;
+            })}
+          </div>}
+        </section>}
       </main>
 
       {editing && <div className="fixed inset-0 z-[3000] bg-slate-950/60 p-3 flex items-center justify-center" onMouseDown={e => { if (e.target === e.currentTarget) setEditing(null); }}>

@@ -34,3 +34,9 @@ Thumbs.db
 
 # Local-only historical photo browser and its large database backups
 三義鄉路燈歷史照片瀏覽器/
+
+# Local archive for retired build snapshots and logs
+bak/
+
+# 僅保留本機維護文件，不提交至 GitHub
+README.md
